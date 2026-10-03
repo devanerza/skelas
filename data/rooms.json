@@ -1,0 +1,32 @@
+[
+  {
+    "id": "R501",
+    "name": "Kelas 501",
+    "type": "CLASSROOM",
+    "capacity": 40
+  },
+  {
+    "id": "R502",
+    "name": "Kelas 502",
+    "type": "CLASSROOM",
+    "capacity": 40
+  },
+  {
+    "id": "R503",
+    "name": "Kelas 503",
+    "type": "CLASSROOM",
+    "capacity": 35
+  },
+  {
+    "id": "LAB01",
+    "name": "Lab Komputer",
+    "type": "COMPUTER_LAB",
+    "capacity": 30
+  },
+  {
+    "id": "LAB02",
+    "name": "Lab Logistik",
+    "type": "LOGISTICS_LAB",
+    "capacity": 25
+  }
+]

@@ -1,0 +1,34 @@
+[
+  {
+    "course_id": "MK001",
+    "lecturer_id": "D001"
+  },
+  {
+    "course_id": "MK002",
+    "lecturer_id": "D002"
+  },
+  {
+    "course_id": "MK003",
+    "lecturer_id": "D003"
+  },
+  {
+    "course_id": "MK004",
+    "lecturer_id": "D004"
+  },
+  {
+    "course_id": "MK005",
+    "lecturer_id": "D005"
+  },
+  {
+    "course_id": "MK006",
+    "lecturer_id": "D001"
+  },
+  {
+    "course_id": "MK007",
+    "lecturer_id": "D002"
+  },
+  {
+    "course_id": "MK008",
+    "lecturer_id": "D005"
+  }
+]

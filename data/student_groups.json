@@ -1,0 +1,50 @@
+[
+  {
+    "id": "IF-1",
+    "program": "IF",
+    "cohort": 2024,
+    "semester": 1
+  },
+  {
+    "id": "IF-3",
+    "program": "IF",
+    "cohort": 2023,
+    "semester": 3
+  },
+  {
+    "id": "IF-5",
+    "program": "IF",
+    "cohort": 2022,
+    "semester": 5
+  },
+  {
+    "id": "BD-1",
+    "program": "BD",
+    "cohort": 2024,
+    "semester": 1
+  },
+  {
+    "id": "BD-3",
+    "program": "BD",
+    "cohort": 2023,
+    "semester": 3
+  },
+  {
+    "id": "BD-5",
+    "program": "BD",
+    "cohort": 2022,
+    "semester": 5
+  },
+  {
+    "id": "TL-5",
+    "program": "TL",
+    "cohort": 2022,
+    "semester": 5
+  },
+  {
+    "id": "TL-7",
+    "program": "TL",
+    "cohort": 2021,
+    "semester": 7
+  }
+]

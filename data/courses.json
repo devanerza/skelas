@@ -1,0 +1,66 @@
+[
+  {
+    "id": "MK001",
+    "code": "IF101",
+    "name": "Algoritma dan Pemrograman Dasar",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK002",
+    "code": "IF301",
+    "name": "Sistem Basis Data",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "COMPUTER_LAB"
+  },
+  {
+    "id": "MK003",
+    "code": "IF501",
+    "name": "Artificial Intelligence",
+    "curriculum_semester": 5,
+    "credits": 3,
+    "room_type_required": "COMPUTER_LAB"
+  },
+  {
+    "id": "MK004",
+    "code": "BD201",
+    "name": "Digital Marketing",
+    "curriculum_semester": 3,
+    "credits": 2,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK005",
+    "code": "TL301",
+    "name": "Manajemen Logistik",
+    "curriculum_semester": 5,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK006",
+    "code": "GEN101",
+    "name": "Pancasila",
+    "curriculum_semester": 1,
+    "credits": 2,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK007",
+    "code": "IF201",
+    "name": "Struktur Data",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "COMPUTER_LAB"
+  },
+  {
+    "id": "MK008",
+    "code": "TL501",
+    "name": "Praktikum Logistik",
+    "curriculum_semester": 5,
+    "credits": 4,
+    "room_type_required": "LOGISTICS_LAB"
+  }
+]

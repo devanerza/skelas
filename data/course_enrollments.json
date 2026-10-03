@@ -1,0 +1,34 @@
+[
+  {
+    "course_id": "MK001",
+    "student_groups": ["IF-1"]
+  },
+  {
+    "course_id": "MK002",
+    "student_groups": ["IF-3", "BD-3"]
+  },
+  {
+    "course_id": "MK003",
+    "student_groups": ["IF-3", "IF-5"]
+  },
+  {
+    "course_id": "MK004",
+    "student_groups": ["BD-3"]
+  },
+  {
+    "course_id": "MK005",
+    "student_groups": ["TL-5"]
+  },
+  {
+    "course_id": "MK006",
+    "student_groups": ["IF-1", "BD-1"]
+  },
+  {
+    "course_id": "MK007",
+    "student_groups": ["IF-3"]
+  },
+  {
+    "course_id": "MK008",
+    "student_groups": ["TL-5", "TL-7"]
+  }
+]
