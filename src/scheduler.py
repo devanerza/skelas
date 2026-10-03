@@ -51,6 +51,9 @@ class CourseScheduler:
         print("  - Room requirement constraints...")
         self._add_room_requirement_constraints()
         
+        print("  - Optimization objective (compact schedule)...")
+        self._add_objective()
+        
         print(f"Total constraints: {len(self.model.Proto().constraints)}")
         print("Solving...")
         solver = cp_model.CpSolver()
@@ -243,6 +246,35 @@ class CourseScheduler:
                             # Cannot be both this day and this block
                             self.model.AddBoolOr([is_this_day.Not(), is_this_block.Not()])
     
+    def _add_objective(self):
+        """
+        Minimize schedule span:
+        1. Number of distinct days used (fewer days = more compact week)
+        2. Total start slot index (earlier starts within used days)
+        """
+        # Day used: day_used[d] = 1 if any course scheduled on day d
+        course_ids = [c.id for c in self.data.courses]
+        day_used = []
+        for d in range(len(DAYS)):
+            is_used = self.model.NewBoolVar(f'day_{d}_used')
+            # is_used == 1 iff at least one course uses day d
+            course_on_day = []
+            for c in course_ids:
+                on_day = self.model.NewBoolVar(f'{c}_on_day_{d}')
+                self.model.Add(self.vars[c]['day'] == d).OnlyEnforceIf(on_day)
+                self.model.Add(self.vars[c]['day'] != d).OnlyEnforceIf(on_day.Not())
+                course_on_day.append(on_day)
+            
+            self.model.AddBoolOr(course_on_day).OnlyEnforceIf(is_used)
+            self.model.AddBoolAnd([c.Not() for c in course_on_day]).OnlyEnforceIf(is_used.Not())
+            day_used.append(is_used)
+        
+        # Earlier starts: block_idx already ordered morning-first (idx 0 = slot 1)
+        start_cost = [self.vars[c]['block_idx'] for c in course_ids]
+        
+        # Weight: days dominate, then start slots
+        self.model.Minimize(100 * sum(day_used) + sum(start_cost))
+
     def _add_room_requirement_constraints(self):
         """Course requiring specific room type gets compatible room"""
         # Already handled by filtering compatible rooms in _create_variables
