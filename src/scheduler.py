@@ -200,9 +200,10 @@ class CourseScheduler:
                     overlap = self.model.NewBoolVar(f'{c1}_{c2}_overlap_{room_id}')
                     self._add_overlap_check(c1, c2, overlap)
                     
-                    # If both_use AND same_day -> NOT overlap
+                    # If both_use AND same_day AND overlap -> conflict (bidirectional)
                     conflict = self.model.NewBoolVar(f'{c1}_{c2}_conflict_{room_id}')
                     self.model.AddBoolAnd([both_use, same_day, overlap]).OnlyEnforceIf(conflict)
+                    self.model.AddBoolOr([both_use.Not(), same_day.Not(), overlap.Not()]).OnlyEnforceIf(conflict.Not())
                     self.model.Add(conflict == 0)  # Forbid conflict
     
     def _add_lecturer_availability_constraints(self):
@@ -235,7 +236,9 @@ class CourseScheduler:
                             is_this_block = self.model.NewBoolVar(f'{course_id}_block{block_idx}')
                             
                             self.model.Add(self.vars[course_id]['day'] == day_idx).OnlyEnforceIf(is_this_day)
+                            self.model.Add(self.vars[course_id]['day'] != day_idx).OnlyEnforceIf(is_this_day.Not())
                             self.model.Add(self.vars[course_id]['block_idx'] == block_idx).OnlyEnforceIf(is_this_block)
+                            self.model.Add(self.vars[course_id]['block_idx'] != block_idx).OnlyEnforceIf(is_this_block.Not())
                             
                             # Cannot be both this day and this block
                             self.model.AddBoolOr([is_this_day.Not(), is_this_block.Not()])
