@@ -138,34 +138,35 @@ class CourseScheduler:
     
     def _add_room_conflict_constraints(self):
         """Room cannot host two courses at the same time"""
-        # For all course pairs, if they can use the same room, add conflict
-        courses = self.data.courses
-        for i in range(len(courses)):
-            for j in range(i + 1, len(courses)):
-                c1, c2 = courses[i].id, courses[j].id
-                
-                # Check if courses share compatible rooms
-                rooms1 = set(r.id for r in self.vars[c1]['rooms'])
-                rooms2 = set(r.id for r in self.vars[c2]['rooms'])
-                
-                if rooms1 & rooms2:  # If they share rooms
-                    # If same day and overlapping slots and same room -> conflict
-                    same_day = self.model.NewBoolVar(f'{c1}_{c2}_same_day')
-                    self.model.Add(self.vars[c1]['day'] == self.vars[c2]['day']).OnlyEnforceIf(same_day)
-                    self.model.Add(self.vars[c1]['day'] != self.vars[c2]['day']).OnlyEnforceIf(same_day.Not())
+        # Group courses by potential room (simpler approach)
+        room_courses = {}
+        for course in self.data.courses:
+            compatible_rooms = self.vars[course.id]['rooms']
+            for room in compatible_rooms:
+                room_id = room.id
+                if room_id not in room_courses:
+                    room_courses[room_id] = []
+                room_courses[room_id].append(course.id)
+        
+        # For each room, ensure courses using it don't overlap
+        for room_id, course_ids in room_courses.items():
+            if len(course_ids) < 2:
+                continue
+            
+            for i in range(len(course_ids)):
+                for j in range(i + 1, len(course_ids)):
+                    c1, c2 = course_ids[i], course_ids[j]
                     
-                    # If same day, check overlap and room
-                    # Simplified: if same day and potentially same room, ensure different blocks
-                    overlaps = self.model.NewBoolVar(f'{c1}_{c2}_overlap')
-                    self._add_overlap_check(c1, c2, overlaps)
+                    # If both assigned to this room, they can't overlap
+                    room1_is_this = self._course_uses_room(c1, room_id)
+                    room2_is_this = self._course_uses_room(c2, room_id)
                     
-                    same_room = self.model.NewBoolVar(f'{c1}_{c2}_same_room')
-                    self._add_same_room_check(c1, c2, same_room)
+                    # If both use this room, they must not overlap in time
+                    both_use_room = self.model.NewBoolVar(f'{c1}_{c2}_both_room_{room_id}')
+                    self.model.AddBoolAnd([room1_is_this, room2_is_this]).OnlyEnforceIf(both_use_room)
                     
-                    # If same_day AND overlaps AND same_room -> INVALID
-                    conflict = self.model.NewBoolVar(f'{c1}_{c2}_conflict')
-                    self.model.AddBoolAnd([same_day, overlaps, same_room]).OnlyEnforceIf(conflict)
-                    self.model.Add(conflict == 0)  # Forbid conflict
+                    # If both_use_room, then must not overlap
+                    self.model.AddImplication(both_use_room, self._get_no_overlap_constraint(c1, c2))
     
     def _add_lecturer_availability_constraints(self):
         """Course can only be scheduled during lecturer's available time"""
@@ -248,38 +249,51 @@ class CourseScheduler:
         else:
             self.model.Add(overlaps_var == 0)
     
-    def _add_same_room_check(self, c1: str, c2: str, same_room_var):
-        """Check if two courses assigned to same room"""
-        rooms1 = self.vars[c1]['rooms']
-        rooms2 = self.vars[c2]['rooms']
+    def _course_uses_room(self, course_id: str, room_id: str):
+        """Returns bool var indicating if course uses specific room"""
+        rooms = self.vars[course_id]['rooms']
         
-        # Find common rooms
-        common_room_ids = set(r.id for r in rooms1) & set(r.id for r in rooms2)
+        # Find index of this room in course's compatible rooms
+        room_idx = None
+        for i, room in enumerate(rooms):
+            if room.id == room_id:
+                room_idx = i
+                break
         
-        if not common_room_ids:
-            self.model.Add(same_room_var == 0)
-            return
+        if room_idx is None:
+            # Course cannot use this room
+            false_var = self.model.NewBoolVar(f'{course_id}_not_room_{room_id}')
+            self.model.Add(false_var == 0)
+            return false_var
         
-        # Check if both courses assigned to same room
-        same_cases = []
-        for room_id in common_room_ids:
-            idx1 = next(i for i, r in enumerate(rooms1) if r.id == room_id)
-            idx2 = next(i for i, r in enumerate(rooms2) if r.id == room_id)
-            
-            case = self.model.NewBoolVar(f'{c1}_{c2}_room_{room_id}')
-            
-            is_r1 = self.model.NewBoolVar(f'{c1}_room{idx1}')
-            is_r2 = self.model.NewBoolVar(f'{c2}_room{idx2}')
-            
-            self.model.Add(self.vars[c1]['room'] == idx1).OnlyEnforceIf(is_r1)
-            self.model.Add(self.vars[c2]['room'] == idx2).OnlyEnforceIf(is_r2)
-            
-            self.model.AddBoolAnd([is_r1, is_r2]).OnlyEnforceIf(case)
-            same_cases.append(case)
+        # Check if course's room variable equals this index
+        uses_room = self.model.NewBoolVar(f'{course_id}_uses_{room_id}')
+        self.model.Add(self.vars[course_id]['room'] == room_idx).OnlyEnforceIf(uses_room)
+        self.model.Add(self.vars[course_id]['room'] != room_idx).OnlyEnforceIf(uses_room.Not())
+        return uses_room
+    
+    def _get_no_overlap_constraint(self, c1: str, c2: str):
+        """Returns bool var: True if courses don't overlap"""
+        no_overlap = self.model.NewBoolVar(f'{c1}_{c2}_no_overlap')
         
-        if same_cases:
-            self.model.AddBoolOr(same_cases).OnlyEnforceIf(same_room_var)
-            self.model.AddBoolAnd([c.Not() for c in same_cases]).OnlyEnforceIf(same_room_var.Not())
+        # Different day OR different (non-overlapping) blocks
+        same_day = self.model.NewBoolVar(f'{c1}_{c2}_same_day_check')
+        self.model.Add(self.vars[c1]['day'] == self.vars[c2]['day']).OnlyEnforceIf(same_day)
+        self.model.Add(self.vars[c1]['day'] != self.vars[c2]['day']).OnlyEnforceIf(same_day.Not())
+        
+        # If different day, no overlap
+        self.model.AddImplication(same_day.Not(), no_overlap)
+        
+        # If same day, check block overlap
+        overlaps = self.model.NewBoolVar(f'{c1}_{c2}_overlap_check')
+        self._add_overlap_check(c1, c2, overlaps)
+        
+        # If same day and overlaps, then NOT no_overlap
+        both_same_day_and_overlap = self.model.NewBoolVar(f'{c1}_{c2}_both')
+        self.model.AddBoolAnd([same_day, overlaps]).OnlyEnforceIf(both_same_day_and_overlap)
+        self.model.AddImplication(both_same_day_and_overlap, no_overlap.Not())
+        
+        return no_overlap
     
     def _extract_solution(self, solver: cp_model.CpSolver) -> List[Dict]:
         """Extract schedule from solved model"""
