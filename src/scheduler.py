@@ -57,7 +57,7 @@ class CourseScheduler:
         print(f"Total constraints: {len(self.model.Proto().constraints)}")
         print("Solving...")
         solver = cp_model.CpSolver()
-        solver.parameters.max_time_in_seconds = 60.0
+        solver.parameters.max_time_in_seconds = 120.0
         status = solver.Solve(self.model)
         
         solve_time = time.time() - start_time
