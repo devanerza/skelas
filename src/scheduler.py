@@ -165,8 +165,8 @@ class CourseScheduler:
                     both_use_room = self.model.NewBoolVar(f'{c1}_{c2}_both_room_{room_id}')
                     self.model.AddBoolAnd([room1_is_this, room2_is_this]).OnlyEnforceIf(both_use_room)
                     
-                    # If both_use_room, then must not overlap
-                    self.model.AddImplication(both_use_room, self._get_no_overlap_constraint(c1, c2))
+                    # If both_use_room -> add no_overlap_constraint directly
+                    self._add_no_overlap_constraint_conditional(c1, c2, both_use_room)
     
     def _add_lecturer_availability_constraints(self):
         """Course can only be scheduled during lecturer's available time"""
@@ -209,7 +209,7 @@ class CourseScheduler:
         pass
     
     def _add_no_overlap_constraint(self, course1_id: str, course2_id: str):
-        """Ensure two courses don't overlap in time"""
+        """Ensure two courses don't overlap in time (unconditional)"""
         # Different day OR different (non-overlapping) time blocks
         same_day = self.model.NewBoolVar(f'{course1_id}_{course2_id}_same_day')
         self.model.Add(self.vars[course1_id]['day'] == self.vars[course2_id]['day']).OnlyEnforceIf(same_day)
@@ -221,6 +221,24 @@ class CourseScheduler:
         
         # If same_day, then NOT overlaps
         self.model.AddImplication(same_day, overlaps.Not())
+    
+    def _add_no_overlap_constraint_conditional(self, c1: str, c2: str, condition_var):
+        """Ensure two courses don't overlap when condition is true"""
+        # If condition true: different day OR non-overlapping blocks
+        
+        # Check if same day
+        same_day = self.model.NewBoolVar(f'{c1}_{c2}_cond_same_day')
+        self.model.Add(self.vars[c1]['day'] == self.vars[c2]['day']).OnlyEnforceIf(same_day)
+        self.model.Add(self.vars[c1]['day'] != self.vars[c2]['day']).OnlyEnforceIf(same_day.Not())
+        
+        # Check if blocks overlap
+        overlaps = self.model.NewBoolVar(f'{c1}_{c2}_cond_overlap')
+        self._add_overlap_check(c1, c2, overlaps)
+        
+        # If condition AND same_day -> NOT overlap
+        both = self.model.NewBoolVar(f'{c1}_{c2}_cond_both')
+        self.model.AddBoolAnd([condition_var, same_day]).OnlyEnforceIf(both)
+        self.model.AddImplication(both, overlaps.Not())
     
     def _add_overlap_check(self, c1: str, c2: str, overlaps_var):
         """Check if two course blocks overlap"""
@@ -271,29 +289,6 @@ class CourseScheduler:
         self.model.Add(self.vars[course_id]['room'] == room_idx).OnlyEnforceIf(uses_room)
         self.model.Add(self.vars[course_id]['room'] != room_idx).OnlyEnforceIf(uses_room.Not())
         return uses_room
-    
-    def _get_no_overlap_constraint(self, c1: str, c2: str):
-        """Returns bool var: True if courses don't overlap"""
-        no_overlap = self.model.NewBoolVar(f'{c1}_{c2}_no_overlap')
-        
-        # Different day OR different (non-overlapping) blocks
-        same_day = self.model.NewBoolVar(f'{c1}_{c2}_same_day_check')
-        self.model.Add(self.vars[c1]['day'] == self.vars[c2]['day']).OnlyEnforceIf(same_day)
-        self.model.Add(self.vars[c1]['day'] != self.vars[c2]['day']).OnlyEnforceIf(same_day.Not())
-        
-        # If different day, no overlap
-        self.model.AddImplication(same_day.Not(), no_overlap)
-        
-        # If same day, check block overlap
-        overlaps = self.model.NewBoolVar(f'{c1}_{c2}_overlap_check')
-        self._add_overlap_check(c1, c2, overlaps)
-        
-        # If same day and overlaps, then NOT no_overlap
-        both_same_day_and_overlap = self.model.NewBoolVar(f'{c1}_{c2}_both')
-        self.model.AddBoolAnd([same_day, overlaps]).OnlyEnforceIf(both_same_day_and_overlap)
-        self.model.AddImplication(both_same_day_and_overlap, no_overlap.Not())
-        
-        return no_overlap
     
     def _extract_solution(self, solver: cp_model.CpSolver) -> List[Dict]:
         """Extract schedule from solved model"""
