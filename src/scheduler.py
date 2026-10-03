@@ -272,8 +272,11 @@ class CourseScheduler:
         # Earlier starts: block_idx already ordered morning-first (idx 0 = slot 1)
         start_cost = [self.vars[c]['block_idx'] for c in course_ids]
         
-        # Weight: days dominate, then start slots
-        self.model.Minimize(100 * sum(day_used) + sum(start_cost))
+        # Earlier days tie-break: prefer Monday over Friday
+        day_cost = [self.vars[c]['day'] for c in course_ids]
+        
+        # Weight: days dominate, then earlier days, then earlier slots
+        self.model.Minimize(100 * sum(day_used) + 10 * sum(day_cost) + sum(start_cost))
 
     def _add_room_requirement_constraints(self):
         """Course requiring specific room type gets compatible room"""
