@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 import sys
 from pathlib import Path
 
@@ -41,6 +42,15 @@ def main():
     
     if result.status == "FEASIBLE":
         print("✅ Valid schedule found!\n")
+        
+        # Export for independent validation: python validate_schedule.py schedule.json
+        out_path = Path(__file__).parent / "schedule.json"
+        out_path.write_text(
+            json.dumps(result.schedule, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        print(f"Exported: {out_path.name}")
+        print("Validate: python validate_schedule.py schedule.json\n")
         
         # Group by day
         by_day = {}

@@ -7,3 +7,5 @@ venv/
 env/
 ENV/
 .venv
+schedule.json
+schedule_bad.json
