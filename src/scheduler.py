@@ -35,12 +35,23 @@ class CourseScheduler:
         
         print("Adding constraints...")
         self._add_consecutive_slot_constraints()
+        
+        print("  - Lecturer conflict constraints...")
         self._add_lecturer_conflict_constraints()
+        
+        print("  - Student group conflict constraints...")
         self._add_student_group_conflict_constraints()
+        
+        print("  - Room conflict constraints...")
         self._add_room_conflict_constraints()
+        
+        print("  - Lecturer availability constraints...")
         self._add_lecturer_availability_constraints()
+        
+        print("  - Room requirement constraints...")
         self._add_room_requirement_constraints()
         
+        print(f"Total constraints: {len(self.model.Proto().constraints)}")
         print("Solving...")
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = 60.0
@@ -257,16 +268,19 @@ class CourseScheduler:
         overlap_cases = []
         for i, b1 in enumerate(blocks1):
             for j, b2 in enumerate(blocks2):
-                if set(b1) & set(b2):  # Overlap
+                if set(b1) & set(b2):  # Overlap exists
                     case = self.model.NewBoolVar(f'{c1}_b{i}_{c2}_b{j}_overlaps')
                     
                     is_b1 = self.model.NewBoolVar(f'{c1}_is_b{i}')
-                    is_b2 = self.model.NewBoolVar(f'{c2}_is_b{j}')
-                    
                     self.model.Add(self.vars[c1]['block_idx'] == i).OnlyEnforceIf(is_b1)
+                    self.model.Add(self.vars[c1]['block_idx'] != i).OnlyEnforceIf(is_b1.Not())
+                    
+                    is_b2 = self.model.NewBoolVar(f'{c2}_is_b{j}')
                     self.model.Add(self.vars[c2]['block_idx'] == j).OnlyEnforceIf(is_b2)
+                    self.model.Add(self.vars[c2]['block_idx'] != j).OnlyEnforceIf(is_b2.Not())
                     
                     self.model.AddBoolAnd([is_b1, is_b2]).OnlyEnforceIf(case)
+                    self.model.AddBoolOr([is_b1.Not(), is_b2.Not()]).OnlyEnforceIf(case.Not())
                     overlap_cases.append(case)
         
         if overlap_cases:
