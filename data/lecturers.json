@@ -1,22 +1,82 @@
 [
   {
     "id": "D001",
-    "name": "Dr. Ahmad"
+    "name": "Ari Widianto, S.Kom., M.Kom"
   },
   {
     "id": "D002",
-    "name": "Dr. Budi"
+    "name": "Trian Basofi Rohman, S.Si., M.Kom."
   },
   {
     "id": "D003",
-    "name": "Dr. Citra"
+    "name": "Herlinah B, S.Kom., M.Kom"
   },
   {
     "id": "D004",
-    "name": "Dr. Dewi"
+    "name": "Ardiyan Nur Pratama, S.Kom. M.Kom"
   },
   {
     "id": "D005",
-    "name": "Dr. Eko"
+    "name": "Wasiran, S.Kom. M.T"
+  },
+  {
+    "id": "D006",
+    "name": "Sugianto, S.Kom., M.Kom"
+  },
+  {
+    "id": "D007",
+    "name": "Franky Rawung, S.Kom., M.Kom"
+  },
+  {
+    "id": "D008",
+    "name": "Arvendo Mahardika, S.Pd, MM"
+  },
+  {
+    "id": "D009",
+    "name": "Catur Liliek Mailalina, S.Pd, MM"
+  },
+  {
+    "id": "D010",
+    "name": "Nurul Aisah, SE, MM"
+  },
+  {
+    "id": "D011",
+    "name": "Radityo Wiratsongko, S.Kom, MM"
+  },
+  {
+    "id": "D012",
+    "name": "Salsabil Fadilah Firdaus, A.Md.Pjk., S.Sos, M.Sos, CPR,CICoR"
+  },
+  {
+    "id": "D013",
+    "name": "Dr. Syafi'I, SE, M.Ak, BKP"
+  },
+  {
+    "id": "D014",
+    "name": "Sutrisno Harianto, S.T., M.T."
+  },
+  {
+    "id": "D015",
+    "name": "Eko Wijaya, S.T., M.T."
+  },
+  {
+    "id": "D016",
+    "name": "Akhmad Nidhomuz Zaman, ST, MT"
+  },
+  {
+    "id": "D017",
+    "name": "Yusuf Aldriyanto, S.T.,M.MT"
+  },
+  {
+    "id": "D018",
+    "name": "Cilda Thesisa Ilmawan Dzinnur, ST, MT"
+  },
+  {
+    "id": "D019",
+    "name": "Dr. Sudoto, M.E."
+  },
+  {
+    "id": "D020",
+    "name": "Dr. M. Athoiful Fanan, M.Pd"
   }
 ]

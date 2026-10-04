@@ -1,66 +1,498 @@
 [
   {
     "id": "MK001",
-    "code": "IF101",
-    "name": "Algoritma dan Pemrograman Dasar",
-    "curriculum_semester": 1,
+    "code": "ARI-24-IF",
+    "name": "Enterprise Resource Planning",
+    "curriculum_semester": 3,
     "credits": 3,
     "room_type_required": "CLASSROOM"
   },
   {
     "id": "MK002",
-    "code": "IF301",
+    "code": "ARI-24-IF",
+    "name": "Manajemen Proyek Perangkat Lunak",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK003",
+    "code": "TRI-24-IF",
+    "name": "Pemrograman Mobile",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "COMPUTER_LAB"
+  },
+  {
+    "id": "MK004",
+    "code": "TRI-23-IF",
+    "name": "Penjaminan Mutu Perangkat Lunak",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK005",
+    "code": "TRI-24-IF",
+    "name": "Pemrograman Berbasis Kerangka Kerja",
+    "curriculum_semester": 4,
+    "credits": 3,
+    "room_type_required": "COMPUTER_LAB"
+  },
+  {
+    "id": "MK006",
+    "code": "TRI-23-IF",
+    "name": "Pra Tugas Akhir",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK007",
+    "code": "HER-26-IF",
+    "name": "Pengantar Teknologi Informasi",
+    "curriculum_semester": 2,
+    "credits": 2,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK008",
+    "code": "HER-26-IF",
+    "name": "Organisasi Komputer",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK009",
+    "code": "HER-23-IF",
+    "name": "Audit TI",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK010",
+    "code": "HER-25-IF",
+    "name": "Probabilitas Dan Statistik",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK011",
+    "code": "HER-23-IF",
+    "name": "Riset Operasi",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK012",
+    "code": "HER-23-IF",
+    "name": "Metode Penelitian Ilmiah",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK013",
+    "code": "ARD-26-IF",
+    "name": "Algoritma dan Pemrograman Dasar",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK014",
+    "code": "ARD-24-IF",
+    "name": "Kecerdasan Buatan",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "COMPUTER_LAB"
+  },
+  {
+    "id": "MK015",
+    "code": "ARD-25-IF",
     "name": "Sistem Basis Data",
     "curriculum_semester": 3,
     "credits": 3,
     "room_type_required": "COMPUTER_LAB"
   },
   {
-    "id": "MK003",
-    "code": "IF501",
-    "name": "Artificial Intelligence",
-    "curriculum_semester": 5,
+    "id": "MK016",
+    "code": "WAS-24-IF",
+    "name": "Jaringan Komputer",
+    "curriculum_semester": 4,
+    "credits": 4,
+    "room_type_required": "COMPUTER_LAB"
+  },
+  {
+    "id": "MK017",
+    "code": "WAS-25-IF",
+    "name": "Sistem Operasi",
+    "curriculum_semester": 4,
+    "credits": 4,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK018",
+    "code": "WAS-26-IF",
+    "name": "Sistem Digital",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK019",
+    "code": "24-IF",
+    "name": "Aljabar Linier",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK020",
+    "code": "WAS-25-IF",
+    "name": "Teori Bahasa dan Otomata",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK021",
+    "code": "ARV",
+    "name": "Design Thinking & Problem Definition",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK022",
+    "code": "ARV",
+    "name": "Interactive Web Design",
+    "curriculum_semester": 7,
     "credits": 3,
     "room_type_required": "COMPUTER_LAB"
   },
   {
-    "id": "MK004",
-    "code": "BD201",
-    "name": "Digital Marketing",
+    "id": "MK023",
+    "code": "ARV",
+    "name": "Pengantar Kewirausahaan",
+    "curriculum_semester": 1,
+    "credits": 2,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK024",
+    "code": "ARV",
+    "name": "Web and Mobile Technology",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "COMPUTER_LAB"
+  },
+  {
+    "id": "MK025",
+    "code": "LLK",
+    "name": "Brand Management",
+    "curriculum_semester": 5,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK026",
+    "code": "LLK",
+    "name": "Pengantar Akuntansi",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK027",
+    "code": "NRL",
+    "name": "Manajemen Operasi",
+    "curriculum_semester": 7,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK028",
+    "code": "NRL",
+    "name": "Manajemen Risiko",
+    "curriculum_semester": 7,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK029",
+    "code": "NRL",
+    "name": "Matematika & Statistik Bisnis",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK030",
+    "code": "NRL",
+    "name": "Sistem Informasi Manajemen",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK031",
+    "code": "NRL-25-IF",
+    "name": "Matematika",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK032",
+    "code": "RDT",
+    "name": "Consumer Behaviour",
+    "curriculum_semester": 5,
+    "credits": 2,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK033",
+    "code": "RDT",
+    "name": "Object Oriented Programming",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "COMPUTER_LAB"
+  },
+  {
+    "id": "MK034",
+    "code": "RDT",
+    "name": "Perilaku Organisasi",
+    "curriculum_semester": 7,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK035",
+    "code": "RDT",
+    "name": "Statisik Bisnis",
     "curriculum_semester": 3,
     "credits": 2,
     "room_type_required": "CLASSROOM"
   },
   {
-    "id": "MK005",
-    "code": "TL301",
-    "name": "Manajemen Logistik",
+    "id": "MK036",
+    "code": "SLS",
+    "name": "E Commerce",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK037",
+    "code": "SLS",
+    "name": "Integrated Marketing Communication",
     "curriculum_semester": 5,
     "credits": 3,
     "room_type_required": "CLASSROOM"
   },
   {
-    "id": "MK006",
-    "code": "GEN101",
+    "id": "MK038",
+    "code": "SLS",
+    "name": "Manajemen Strategik",
+    "curriculum_semester": 5,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK039",
+    "code": "SLS",
+    "name": "Market Research",
+    "curriculum_semester": 5,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK040",
+    "code": "SLS",
     "name": "Pancasila",
     "curriculum_semester": 1,
     "credits": 2,
     "room_type_required": "CLASSROOM"
   },
   {
-    "id": "MK007",
-    "code": "IF201",
-    "name": "Struktur Data",
-    "curriculum_semester": 3,
+    "id": "MK041",
+    "code": "SLS",
+    "name": "Psikologi Industri",
+    "curriculum_semester": 1,
     "credits": 3,
-    "room_type_required": "COMPUTER_LAB"
+    "room_type_required": "CLASSROOM"
   },
   {
-    "id": "MK008",
-    "code": "TL501",
-    "name": "Praktikum Logistik",
-    "curriculum_semester": 5,
-    "credits": 4,
-    "room_type_required": "LOGISTICS_LAB"
+    "id": "MK042",
+    "code": "SLS",
+    "name": "Manajemen Ekspor Impor",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK043",
+    "code": "SYA",
+    "name": "Accounting for Decision Maker",
+    "curriculum_semester": 3,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK044",
+    "code": "SYA",
+    "name": "Islam & IPTEK",
+    "curriculum_semester": 7,
+    "credits": 2,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK045",
+    "code": "HAR",
+    "name": "Kewirausaan Lanjut",
+    "curriculum_semester": 1,
+    "credits": 2,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK046",
+    "code": "HAR",
+    "name": "Manajemen Proyek",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK047",
+    "code": "HAR",
+    "name": "Fisika",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK048",
+    "code": "HAR",
+    "name": "Aljabar",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK049",
+    "code": "EKO",
+    "name": "Ekonomi Teknik",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK050",
+    "code": "EKO",
+    "name": "Analisis Estimasi Biaya",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK051",
+    "code": "EKO",
+    "name": "Total Quality Management (TQM)",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK052",
+    "code": "AKH",
+    "name": "Perencanaan dan Pengendalian Sistem Logistik",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK053",
+    "code": "AKH",
+    "name": "Pengantar Teknik Logistik",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK054",
+    "code": "AKH",
+    "name": "Kolaborasi Bisnis Logistik",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK055",
+    "code": "AKH",
+    "name": "Statistik 2",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK056",
+    "code": "YSF",
+    "name": "Riset Operasi 1",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK057",
+    "code": "YSF",
+    "name": "Manajemen Rantai Pasok",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK058",
+    "code": "YSF",
+    "name": "Manajemen Transportasi Udara",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK059",
+    "code": "YSF",
+    "name": "Supply Chain Management",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK060",
+    "code": "CIL",
+    "name": "Desain Grafis, Video dan Photografi",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK061",
+    "code": "CIL",
+    "name": "Manajemen harga dan Pendapatan",
+    "curriculum_semester": 1,
+    "credits": 3,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK062",
+    "code": "26-IF",
+    "name": "Pendidikan Agama",
+    "curriculum_semester": 2,
+    "credits": 2,
+    "room_type_required": "CLASSROOM"
   }
 ]

@@ -1,34 +1,64 @@
 [
-  {
-    "course_id": "MK001",
-    "lecturer_id": "D001"
-  },
-  {
-    "course_id": "MK002",
-    "lecturer_id": "D002"
-  },
-  {
-    "course_id": "MK003",
-    "lecturer_id": "D003"
-  },
-  {
-    "course_id": "MK004",
-    "lecturer_id": "D004"
-  },
-  {
-    "course_id": "MK005",
-    "lecturer_id": "D005"
-  },
-  {
-    "course_id": "MK006",
-    "lecturer_id": "D001"
-  },
-  {
-    "course_id": "MK007",
-    "lecturer_id": "D002"
-  },
-  {
-    "course_id": "MK008",
-    "lecturer_id": "D005"
-  }
+  { "course_id": "MK001", "lecturer_id": "D001" },
+  { "course_id": "MK002", "lecturer_id": "D001" },
+  { "course_id": "MK003", "lecturer_id": "D002" },
+  { "course_id": "MK004", "lecturer_id": "D002" },
+  { "course_id": "MK005", "lecturer_id": "D002" },
+  { "course_id": "MK006", "lecturer_id": "D002" },
+  { "course_id": "MK007", "lecturer_id": "D003" },
+  { "course_id": "MK008", "lecturer_id": "D003" },
+  { "course_id": "MK009", "lecturer_id": "D003" },
+  { "course_id": "MK010", "lecturer_id": "D003" },
+  { "course_id": "MK011", "lecturer_id": "D003" },
+  { "course_id": "MK012", "lecturer_id": "D003" },
+  { "course_id": "MK013", "lecturer_id": "D004" },
+  { "course_id": "MK014", "lecturer_id": "D004" },
+  { "course_id": "MK015", "lecturer_id": "D004" },
+  { "course_id": "MK016", "lecturer_id": "D005" },
+  { "course_id": "MK017", "lecturer_id": "D005" },
+  { "course_id": "MK018", "lecturer_id": "D005" },
+  { "course_id": "MK019", "lecturer_id": "D006" },
+  { "course_id": "MK020", "lecturer_id": "D007" },
+  { "course_id": "MK021", "lecturer_id": "D008" },
+  { "course_id": "MK022", "lecturer_id": "D008" },
+  { "course_id": "MK023", "lecturer_id": "D008" },
+  { "course_id": "MK024", "lecturer_id": "D008" },
+  { "course_id": "MK025", "lecturer_id": "D009" },
+  { "course_id": "MK026", "lecturer_id": "D009" },
+  { "course_id": "MK027", "lecturer_id": "D010" },
+  { "course_id": "MK028", "lecturer_id": "D010" },
+  { "course_id": "MK029", "lecturer_id": "D010" },
+  { "course_id": "MK030", "lecturer_id": "D010" },
+  { "course_id": "MK031", "lecturer_id": "D010" },
+  { "course_id": "MK032", "lecturer_id": "D011" },
+  { "course_id": "MK033", "lecturer_id": "D011" },
+  { "course_id": "MK034", "lecturer_id": "D011" },
+  { "course_id": "MK035", "lecturer_id": "D011" },
+  { "course_id": "MK036", "lecturer_id": "D012" },
+  { "course_id": "MK037", "lecturer_id": "D012" },
+  { "course_id": "MK038", "lecturer_id": "D012" },
+  { "course_id": "MK039", "lecturer_id": "D012" },
+  { "course_id": "MK040", "lecturer_id": "D012" },
+  { "course_id": "MK041", "lecturer_id": "D012" },
+  { "course_id": "MK042", "lecturer_id": "D012" },
+  { "course_id": "MK043", "lecturer_id": "D013" },
+  { "course_id": "MK044", "lecturer_id": "D013" },
+  { "course_id": "MK045", "lecturer_id": "D014" },
+  { "course_id": "MK046", "lecturer_id": "D014" },
+  { "course_id": "MK047", "lecturer_id": "D014" },
+  { "course_id": "MK048", "lecturer_id": "D014" },
+  { "course_id": "MK049", "lecturer_id": "D015" },
+  { "course_id": "MK050", "lecturer_id": "D015" },
+  { "course_id": "MK051", "lecturer_id": "D015" },
+  { "course_id": "MK052", "lecturer_id": "D016" },
+  { "course_id": "MK053", "lecturer_id": "D016" },
+  { "course_id": "MK054", "lecturer_id": "D016" },
+  { "course_id": "MK055", "lecturer_id": "D016" },
+  { "course_id": "MK056", "lecturer_id": "D017" },
+  { "course_id": "MK057", "lecturer_id": "D017" },
+  { "course_id": "MK058", "lecturer_id": "D017" },
+  { "course_id": "MK059", "lecturer_id": "D017" },
+  { "course_id": "MK060", "lecturer_id": "D018" },
+  { "course_id": "MK061", "lecturer_id": "D018" },
+  { "course_id": "MK062", "lecturer_id": "D019" }
 ]
