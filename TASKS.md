@@ -451,12 +451,25 @@ Expected: `INFEASIBLE`
 
 ### 3.5 Benchmark Table
 
-| Courses | Groups | Rooms | Constraints | Solve Time | Status   |
-|---------|--------|-------|-------------|------------|----------|
-| 10      | 5      | 3     | ~50         | 0.1s       | FEASIBLE |
-| 25      | 10     | 5     | ~200        | 0.4s       | FEASIBLE |
-| 50      | 15     | 8     | ~500        | 2.3s       | FEASIBLE |
-| 80      | 20     | 8     | ~1000       | 8.7s       | FEASIBLE |
+Hasil run nyata: `python tests/benchmark.py` (seed deterministik `SSEED = 20261003`,
+validator independen meng-**VALID**ate setiap hasil FEASIBLE).
+Solver timeout 120s. Dataset di-generate dengan load balancing
+(lecturer/group paling ringan diprioritaskan) supaya tidak ada hotspot kapasitas.
+
+| Courses | Lecturers | Rooms | Constraints | Solve Time | Status   | Valid  |
+|---------|-----------|-------|-------------|------------|----------|--------|
+| 10      | 5         | 4     | 8,248       | 0.69s      | FEASIBLE | VALID  |
+| 25      | 8         | 6     | 91,749      | 8.66s      | FEASIBLE | VALID  |
+| 50      | 12        | 8     | 488,612     | 131.30s    | FEASIBLE | VALID  |
+| 80      | 16        | 8     | 1,397,302   | 165.08s    | UNKNOWN  | -      |
+
+Catatan:
+- 80 courses = **UNKNOWN** karena kena solver timeout 120s (1.4 juta constraint).
+  Bukan INFEASIBLE — capacity check (`tests/diagnose_bench.py`) menunjukkan semua
+  lecturer/group/room load masih di bawah batas. Naikkan `max_time_in_seconds`
+  di `src/scheduler.py` bila perlu.
+- Constraint count tumbuh ~kuadratik terhadap jumlah courses (room conflict
+  pairwise).
 
 ---
 

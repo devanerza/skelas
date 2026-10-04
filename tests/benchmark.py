@@ -10,6 +10,7 @@ Run: python tests/benchmark.py
 import io
 import json
 import random
+import re
 import sys
 import tempfile
 from contextlib import redirect_stdout
@@ -112,8 +113,12 @@ def run_bench(n_courses, n_lecturers, n_rooms):
     data_dir = generate_dataset(n_courses, n_lecturers, n_rooms)
     data = SchedulerData(str(data_dir))
 
-    with redirect_stdout(io.StringIO()):
+    out = io.StringIO()
+    with redirect_stdout(out):
         result = CourseScheduler(data).schedule()
+
+    m = re.search(r"Total constraints: (\d+)", out.getvalue())
+    n_constraints = int(m.group(1)) if m else 0
 
     valid = "-"
     if result.status == "FEASIBLE":
@@ -121,13 +126,13 @@ def run_bench(n_courses, n_lecturers, n_rooms):
             ok = ScheduleValidator(data, result.schedule).validate()
         valid = "VALID" if ok else "INVALID"
 
-    return result, valid
+    return result, valid, n_constraints
 
 
 def main():
-    print(f"{'Courses':>8} {'Lect':>5} {'Rooms':>5} {'Time':>8} "
+    print(f"{'Courses':>8} {'Lect':>5} {'Rooms':>5} {'Constr':>7} {'Time':>8} "
           f"{'Status':>11} {'Valid':>7}")
-    print("-" * 52)
+    print("-" * 60)
 
     scenarios = [
         (10, 5, 4),
@@ -137,10 +142,10 @@ def main():
     ]
     rows = []
     for n_c, n_l, n_r in scenarios:
-        result, valid = run_bench(n_c, n_l, n_r)
-        print(f"{n_c:>8} {n_l:>5} {n_r:>5} {result.solve_time:>7.2f}s "
+        result, valid, n_constr = run_bench(n_c, n_l, n_r)
+        print(f"{n_c:>8} {n_l:>5} {n_r:>5} {n_constr:>7} {result.solve_time:>7.2f}s "
               f"{result.status:>11} {valid:>7}")
-        rows.append((n_c, n_l, n_r, result, valid))
+        rows.append((n_c, n_l, n_r, n_constr, result, valid))
         if result.status not in ("FEASIBLE", "INFEASIBLE"):
             print(f"  !! {result.message}")
 
