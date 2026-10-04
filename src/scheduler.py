@@ -82,6 +82,147 @@ class CourseScheduler:
                 message="Solver did not find a solution in time"
             )
     
+    def diagnose(self) -> List[str]:
+        """Concrete, data-driven findings when the model is infeasible.
+
+        Each finding names the offending entity and the file to edit, so the
+        user does not have to guess which of the generic causes applies.
+        """
+        findings = []
+        week_slots = len(DAYS) * 9  # 5 morning + 4 afternoon per day
+
+        # 1. Courses whose lecturer availability leaves no/few valid blocks
+        for course in self.data.courses:
+            lecturer_id = self.data.get_course_lecturer(course.id)
+            availability = self.data.get_lecturer_availability(lecturer_id) if lecturer_id else None
+            if not availability:
+                continue
+            blocks = generate_consecutive_blocks(course.credits)
+            options = sum(
+                1 for day_name in DAYS
+                if day_name in availability
+                for block in blocks
+                if set(block).issubset(set(availability[day_name]))
+            )
+            if options == 0:
+                findings.append(
+                    f"{course.code} ({course.id}): NO valid slot — lecturer {lecturer_id} "
+                    f"availability rules out every {course.credits}-SKS block. Fix: widen "
+                    "data/lecturer_availability.json or reassign in data/teaching_assignments.json")
+            elif options <= 4:
+                findings.append(
+                    f"{course.code} ({course.id}): only {options} valid (day, block) options "
+                    f"with lecturer {lecturer_id} availability — high conflict risk. Fix: widen "
+                    "data/lecturer_availability.json")
+
+        # 2. Lecturer load vs availability (static check, then solver probe)
+        lecturer_courses = {}
+        for course in self.data.courses:
+            lecturer_id = self.data.get_course_lecturer(course.id)
+            if lecturer_id:
+                lecturer_courses.setdefault(lecturer_id, []).append(course)
+
+        for lecturer_id, courses in sorted(lecturer_courses.items()):
+            availability = self.data.get_lecturer_availability(lecturer_id) or {}
+            if not availability or len(courses) < 2:
+                continue
+            free_slots = sum(len(v) for v in availability.values())
+            load = sum(c.credits for c in courses)
+            if load > free_slots:
+                findings.append(
+                    f"Lecturer {lecturer_id}: teaches {load} SKS but only {free_slots} free "
+                    f"slots ({len(availability)} day(s)) — impossible even before conflicts. "
+                    "Fix: widen data/lecturer_availability.json or reassign a course in "
+                    "data/teaching_assignments.json")
+            elif self._probe_lecturer_fit(courses, availability):
+                findings.append(
+                    f"Lecturer {lecturer_id}: {load} SKS in {free_slots} free slots cannot be "
+                    "packed as consecutive blocks — provably infeasible alone. Fix: widen "
+                    "data/lecturer_availability.json or reassign a course in "
+                    "data/teaching_assignments.json")
+
+        # 3. Student group load
+        group_load = {}
+        for course in self.data.courses:
+            for group in self.data.get_course_student_groups(course.id):
+                group_load[group] = group_load.get(group, 0) + course.credits
+        for group, load in sorted(group_load.items()):
+            if load > week_slots - 6:
+                findings.append(
+                    f"Student group {group}: {load} SKS out of {week_slots} weekly slots — "
+                    "almost no slack for conflicts. Fix: move a course to another group in "
+                    "data/course_enrollments.json")
+
+        # 4. Room capacity
+        type_demand = {}
+        for course in self.data.courses:
+            type_demand[course.room_type_required] = \
+                type_demand.get(course.room_type_required, 0) + course.credits
+        for room_type, demand in sorted(type_demand.items()):
+            rooms = [r for r in self.data.rooms if r.type == room_type]
+            capacity = len(rooms) * week_slots
+            if not rooms:
+                findings.append(
+                    f"No room of type {room_type} exists. Fix: add one in data/rooms.json")
+            elif demand > capacity:
+                findings.append(
+                    f"Rooms [{room_type}]: {demand} SKS demand EXCEEDS {capacity} slot capacity "
+                    f"({len(rooms)} room(s)). Fix: add rooms in data/rooms.json or relax "
+                    "room_type_required in data/courses.json")
+            elif demand > capacity * 0.9:
+                findings.append(
+                    f"Rooms [{room_type}]: {demand} SKS vs {capacity} slot capacity "
+                    f"({len(rooms)} room(s)) — near capacity, fragmentation likely breaks it. "
+                    "Fix: add a room in data/rooms.json")
+
+        if not findings:
+            findings.append(
+                "No single lecturer, group, or room violates a constraint alone — the conflict "
+                "comes from their combination. Bisect by relaxing one family at a time: widen "
+                "all availability in data/lecturer_availability.json (or clear "
+                "room_type_required in data/courses.json), re-run, and see which change makes "
+                "it feasible.")
+        return findings
+
+    def _probe_lecturer_fit(self, courses: List, availability: Dict) -> bool:
+        """True only if this lecturer's courses provably cannot fit their
+        availability (sub-model: courses + availability + no-overlap)."""
+        model = cp_model.CpModel()
+        intervals = []
+        for course in courses:
+            blocks = generate_consecutive_blocks(course.credits)
+            day = model.NewIntVar(0, len(DAYS) - 1, f'{course.id}_pday')
+            block_idx = model.NewIntVar(0, len(blocks) - 1, f'{course.id}_pblock')
+            offsets = [b[0] - 1 if b[0] <= 5 else b[0] for b in blocks]
+            off = model.NewIntVar(0, 9, f'{course.id}_poff')
+            model.AddElement(block_idx, offsets, off)
+            start = model.NewIntVar(0, 10 * len(DAYS) - 1, f'{course.id}_pstart')
+            model.Add(start == 10 * day + off)
+            end = model.NewIntVar(0, 10 * len(DAYS) + 5, f'{course.id}_pend')
+            model.Add(end == start + course.credits)
+            intervals.append(
+                model.NewIntervalVar(start, course.credits, end, f'{course.id}_piv'))
+
+            for day_idx, day_name in enumerate(DAYS):
+                if day_name not in availability:
+                    model.Add(day != day_idx)
+                else:
+                    available = set(availability[day_name])
+                    for k, block in enumerate(blocks):
+                        if not set(block).issubset(available):
+                            is_day = model.NewBoolVar(f'{course.id}_pd{day_idx}')
+                            is_block = model.NewBoolVar(f'{course.id}_pb{day_idx}_{k}')
+                            model.Add(day == day_idx).OnlyEnforceIf(is_day)
+                            model.Add(day != day_idx).OnlyEnforceIf(is_day.Not())
+                            model.Add(block_idx == k).OnlyEnforceIf(is_block)
+                            model.Add(block_idx != k).OnlyEnforceIf(is_block.Not())
+                            model.AddBoolOr([is_day.Not(), is_block.Not()])
+
+        model.AddNoOverlap(intervals)
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = 5.0
+        return solver.Solve(model) == cp_model.INFEASIBLE
+
     def _create_variables(self):
         """Create decision variables + time intervals for each course.
 

@@ -81,14 +81,9 @@ def main():
     
     elif result.status == "INFEASIBLE":
         print(f"❌ {result.message}")
-        print("\nPossible causes:")
-        print("- Conflicting lecturer availability")
-        print("- Insufficient rooms")
-        print("- Over-constrained student groups")
-        print("\nSuggestions:")
-        print("- Check lecturer_availability.json")
-        print("- Add more rooms or relax room requirements")
-        print("- Review course enrollments for conflicts")
+        print("\nDiagnosis (concrete blockers found in your data):")
+        for i, finding in enumerate(scheduler.diagnose(), 1):
+            print(f"{i}. {finding}")
         return 1
     
     else:
