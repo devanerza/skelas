@@ -131,16 +131,22 @@ class DataValidator:
     def _validate_teaching_assignments(self, assignments: List[TeachingAssignment],
                                        courses: List[Course], lecturers: List[Lecturer]):
         course_ids = {c.id for c in courses}
-        lecturer_ids = {l.id for l in lecturers}
+        lecturer_ids_set = {l.id for l in lecturers}
         assigned_courses = set()
-        
+
         for assignment in assignments:
             if assignment.course_id not in course_ids:
                 self.errors.append(f"Assignment references non-existent course: {assignment.course_id}")
-            
-            if assignment.lecturer_id not in lecturer_ids:
-                self.errors.append(f"Assignment references non-existent lecturer: {assignment.lecturer_id}")
-            
+
+            for lid in assignment.all_lecturer_ids:
+                if lid not in lecturer_ids_set:
+                    self.errors.append(f"Assignment references non-existent lecturer: {lid}")
+
+            if assignment.needs_review:
+                self.warnings.append(
+                    f"Assignment {assignment.course_id} flagged needs_review — "
+                    "confirm or edit in data/teaching_assignments.json")
+
             assigned_courses.add(assignment.course_id)
         
         unassigned = course_ids - assigned_courses

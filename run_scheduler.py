@@ -29,6 +29,18 @@ def main():
     
     print("Initializing scheduler...")
     scheduler = CourseScheduler(data)
+
+    flagged = [ta for ta in data.teaching_assignments if ta.needs_review]
+    if flagged:
+        print("\n⚠ Assignments flagged needs_review (edit data/teaching_assignments.json):")
+        for ta in flagged:
+            course = data.course_dict.get(ta.course_id)
+            name = course.name if course else ta.course_id
+            lecturers = ", ".join(
+                data.lecturer_dict[l].name for l in ta.all_lecturer_ids
+                if l in data.lecturer_dict)
+            print(f"  - {ta.course_id} {name}: {lecturers or '(no lecturer)'}")
+        print()
     
     print()
     result = scheduler.schedule()

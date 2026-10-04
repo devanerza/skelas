@@ -32,7 +32,10 @@ class SchedulerData:
         
         # Build enrollment and assignment maps
         self.course_to_groups = {ce.course_id: ce.student_groups for ce in self.course_enrollments}
-        self.course_to_lecturer = {ta.course_id: ta.lecturer_id for ta in self.teaching_assignments}
+        # course -> list of lecturer ids; repeated course_id rows merge into one list
+        self.course_to_lecturer: Dict[str, List[str]] = {}
+        for ta in self.teaching_assignments:
+            self.course_to_lecturer.setdefault(ta.course_id, []).extend(ta.all_lecturer_ids)
         self.lecturer_to_availability = {la.lecturer_id: la.availability for la in self.lecturer_availability}
     
     def _load_json(self, filename: str) -> List[Dict]:
@@ -75,7 +78,11 @@ class SchedulerData:
         return self.course_to_groups.get(course_id, [])
     
     def get_course_lecturer(self, course_id: str) -> str:
-        return self.course_to_lecturer.get(course_id)
+        lecturers = self.get_course_lecturers(course_id)
+        return lecturers[0] if lecturers else None
+
+    def get_course_lecturers(self, course_id: str) -> List[str]:
+        return self.course_to_lecturer.get(course_id, [])
     
     def get_lecturer_availability(self, lecturer_id: str) -> Dict[str, List[int]]:
         return self.lecturer_to_availability.get(lecturer_id, {})

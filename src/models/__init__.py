@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 
 @dataclass
@@ -50,7 +50,15 @@ class CourseEnrollment:
 @dataclass
 class TeachingAssignment:
     course_id: str
-    lecturer_id: str
+    lecturer_id: str = ""  # legacy single-lecturer field
+    lecturer_ids: Optional[List[str]] = None  # team teaching: 1..N lecturers
+    needs_review: bool = False  # flag: assignment not confirmed by user yet
+
+    @property
+    def all_lecturer_ids(self) -> List[str]:
+        if self.lecturer_ids:
+            return self.lecturer_ids
+        return [self.lecturer_id] if self.lecturer_id else []
 
 
 @dataclass

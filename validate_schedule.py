@@ -55,11 +55,15 @@ class ScheduleValidator:
                             pairs.append((key, e1, e2))
         return pairs
 
+    @staticmethod
+    def _entry_lecturers(e) -> list:
+        # team teaching: check each co-lecturer; fall back to legacy string key
+        return e.get("lecturer_ids") or [e["lecturer"]]
+
     def check_lecturer_conflicts(self) -> bool:
         """14.1: lecturer cannot teach two courses at overlapping times."""
         ok = True
-        for name, e1, e2 in self._overlapping_pairs(
-                lambda e: [e["lecturer"]]):
+        for name, e1, e2 in self._overlapping_pairs(self._entry_lecturers):
             self.fail("lecturer",
                       f"{name}: {e1['course_code']} and {e2['course_code']} "
                       f"overlap on {e1['day']}")
@@ -109,28 +113,27 @@ class ScheduleValidator:
         return ok
 
     def check_lecturer_availability(self) -> bool:
-        """14.4: course must sit inside lecturer availability."""
+        """14.4: course must sit inside EVERY co-lecturer's availability."""
         ok = True
         for e in self.schedule:
-            lecturer_id = self.data.get_course_lecturer(e["course_id"])
-            if not lecturer_id:
-                continue
-            availability = self.data.get_lecturer_availability(lecturer_id)
-            if not availability:
-                continue  # unrestricted
-            if e["day"] not in availability:
-                self.fail("availability",
-                          f"{e['course_code']}: {e['lecturer']} unavailable "
-                          f"on {e['day']}")
-                ok = False
-                continue
-            free = set(availability[e["day"]])
-            missing = set(entry_slots(e)) - free
-            if missing:
-                self.fail("availability",
-                          f"{e['course_code']}: {e['lecturer']} unavailable "
-                          f"slots {sorted(missing)}")
-                ok = False
+            for lecturer_id in self.data.get_course_lecturers(e["course_id"]):
+                availability = self.data.get_lecturer_availability(lecturer_id)
+                if not availability:
+                    continue  # unrestricted
+                lecturer_name = self.data.lecturer_dict[lecturer_id].name
+                if e["day"] not in availability:
+                    self.fail("availability",
+                              f"{e['course_code']}: {lecturer_name} unavailable "
+                              f"on {e['day']}")
+                    ok = False
+                    continue
+                free = set(availability[e["day"]])
+                missing = set(entry_slots(e)) - free
+                if missing:
+                    self.fail("availability",
+                              f"{e['course_code']}: {lecturer_name} unavailable "
+                              f"slots {sorted(missing)}")
+                    ok = False
         return ok
 
     def check_room_requirements(self) -> bool:

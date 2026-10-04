@@ -93,33 +93,32 @@ class CourseScheduler:
 
         # 1. Courses whose lecturer availability leaves no/few valid blocks
         for course in self.data.courses:
-            lecturer_id = self.data.get_course_lecturer(course.id)
-            availability = self.data.get_lecturer_availability(lecturer_id) if lecturer_id else None
-            if not availability:
-                continue
-            blocks = generate_consecutive_blocks(course.credits)
-            options = sum(
-                1 for day_name in DAYS
-                if day_name in availability
-                for block in blocks
-                if set(block).issubset(set(availability[day_name]))
-            )
-            if options == 0:
-                findings.append(
-                    f"{course.code} ({course.id}): NO valid slot — lecturer {lecturer_id} "
-                    f"availability rules out every {course.credits}-SKS block. Fix: widen "
-                    "data/lecturer_availability.json or reassign in data/teaching_assignments.json")
-            elif options <= 4:
-                findings.append(
-                    f"{course.code} ({course.id}): only {options} valid (day, block) options "
-                    f"with lecturer {lecturer_id} availability — high conflict risk. Fix: widen "
-                    "data/lecturer_availability.json")
+            for lecturer_id in self.data.get_course_lecturers(course.id):
+                availability = self.data.get_lecturer_availability(lecturer_id)
+                if not availability:
+                    continue
+                blocks = generate_consecutive_blocks(course.credits)
+                options = sum(
+                    1 for day_name in DAYS
+                    if day_name in availability
+                    for block in blocks
+                    if set(block).issubset(set(availability[day_name]))
+                )
+                if options == 0:
+                    findings.append(
+                        f"{course.code} ({course.id}): NO valid slot — lecturer {lecturer_id} "
+                        f"availability rules out every {course.credits}-SKS block. Fix: widen "
+                        "data/lecturer_availability.json or reassign in data/teaching_assignments.json")
+                elif options <= 4:
+                    findings.append(
+                        f"{course.code} ({course.id}): only {options} valid (day, block) options "
+                        f"with lecturer {lecturer_id} availability — high conflict risk. Fix: widen "
+                        "data/lecturer_availability.json")
 
         # 2. Lecturer load vs availability (static check, then solver probe)
         lecturer_courses = {}
         for course in self.data.courses:
-            lecturer_id = self.data.get_course_lecturer(course.id)
-            if lecturer_id:
+            for lecturer_id in self.data.get_course_lecturers(course.id):
                 lecturer_courses.setdefault(lecturer_id, []).append(course)
 
         for lecturer_id, courses in sorted(lecturer_courses.items()):
@@ -288,11 +287,14 @@ class CourseScheduler:
         pass
     
     def _add_lecturer_conflict_constraints(self):
-        """Lecturer cannot teach two courses at the same time (AddNoOverlap)"""
+        """Lecturer cannot teach two courses at the same time (AddNoOverlap).
+
+        Team teaching: every lecturer of a course gets that course's interval,
+        so all co-lecturers are conflict-checked against their other courses.
+        """
         lecturer_courses = {}
         for course in self.data.courses:
-            lecturer_id = self.data.get_course_lecturer(course.id)
-            if lecturer_id:
+            for lecturer_id in self.data.get_course_lecturers(course.id):
                 lecturer_courses.setdefault(lecturer_id, []).append(course.id)
 
         for lecturer_id, course_ids in lecturer_courses.items():
@@ -329,41 +331,42 @@ class CourseScheduler:
                 [self.vars[c]['room_intervals'][room_id] for c in course_ids])
     
     def _add_lecturer_availability_constraints(self):
-        """Course can only be scheduled during lecturer's available time"""
+        """Course can only be scheduled during ALL its lecturers' available time"""
         for course in self.data.courses:
-            lecturer_id = self.data.get_course_lecturer(course.id)
-            if not lecturer_id:
-                continue
-            
-            availability = self.data.get_lecturer_availability(lecturer_id)
-            if not availability:
-                continue
-            
-            course_id = course.id
-            blocks = self.vars[course_id]['blocks']
-            
-            # For each (day, block) combination, check if lecturer is available
-            for day_idx, day_name in enumerate(DAYS):
-                if day_name not in availability:
-                    # Lecturer not available on this day
-                    self.model.Add(self.vars[course_id]['day'] != day_idx)
-                else:
-                    available_slots = set(availability[day_name])
-                    
-                    # For each block, check if all slots are available
-                    for block_idx, block in enumerate(blocks):
-                        if not set(block).issubset(available_slots):
-                            # This block not available on this day
-                            is_this_day = self.model.NewBoolVar(f'{course_id}_day{day_idx}')
-                            is_this_block = self.model.NewBoolVar(f'{course_id}_block{block_idx}')
-                            
-                            self.model.Add(self.vars[course_id]['day'] == day_idx).OnlyEnforceIf(is_this_day)
-                            self.model.Add(self.vars[course_id]['day'] != day_idx).OnlyEnforceIf(is_this_day.Not())
-                            self.model.Add(self.vars[course_id]['block_idx'] == block_idx).OnlyEnforceIf(is_this_block)
-                            self.model.Add(self.vars[course_id]['block_idx'] != block_idx).OnlyEnforceIf(is_this_block.Not())
-                            
-                            # Cannot be both this day and this block
-                            self.model.AddBoolOr([is_this_day.Not(), is_this_block.Not()])
+            for lecturer_id in self.data.get_course_lecturers(course.id):
+                self._add_availability_for_lecturer(course, lecturer_id)
+
+    def _add_availability_for_lecturer(self, course, lecturer_id: str):
+        availability = self.data.get_lecturer_availability(lecturer_id)
+        if not availability:
+            return
+
+        course_id = course.id
+        blocks = self.vars[course_id]['blocks']
+        suffix = f'_{lecturer_id}'
+
+        # For each (day, block) combination, check if lecturer is available
+        for day_idx, day_name in enumerate(DAYS):
+            if day_name not in availability:
+                # Lecturer not available on this day
+                self.model.Add(self.vars[course_id]['day'] != day_idx)
+            else:
+                available_slots = set(availability[day_name])
+
+                # For each block, check if all slots are available
+                for block_idx, block in enumerate(blocks):
+                    if not set(block).issubset(available_slots):
+                        # This block not available on this day
+                        is_this_day = self.model.NewBoolVar(f'{course_id}_day{day_idx}{suffix}')
+                        is_this_block = self.model.NewBoolVar(f'{course_id}_block{block_idx}{suffix}')
+
+                        self.model.Add(self.vars[course_id]['day'] == day_idx).OnlyEnforceIf(is_this_day)
+                        self.model.Add(self.vars[course_id]['day'] != day_idx).OnlyEnforceIf(is_this_day.Not())
+                        self.model.Add(self.vars[course_id]['block_idx'] == block_idx).OnlyEnforceIf(is_this_block)
+                        self.model.Add(self.vars[course_id]['block_idx'] != block_idx).OnlyEnforceIf(is_this_block.Not())
+
+                        # Cannot be both this day and this block
+                        self.model.AddBoolOr([is_this_day.Not(), is_this_block.Not()])
     
     def _add_objective(self):
         """
@@ -417,8 +420,10 @@ class CourseScheduler:
             block = self.vars[course_id]['blocks'][block_idx]
             room = self.vars[course_id]['rooms'][room_idx]
             
-            lecturer_id = self.data.get_course_lecturer(course_id)
-            lecturer_name = self.data.lecturer_dict[lecturer_id].name if lecturer_id else "Unknown"
+            lecturer_ids = self.data.get_course_lecturers(course_id)
+            lecturer_name = " / ".join(
+                self.data.lecturer_dict[l].name for l in lecturer_ids
+            ) if lecturer_ids else "Unknown"
             
             student_groups = self.data.get_course_student_groups(course_id)
             
@@ -431,6 +436,7 @@ class CourseScheduler:
                 'course_code': course.code,
                 'course_name': course.name,
                 'lecturer': lecturer_name,
+                'lecturer_ids': lecturer_ids,
                 'student_groups': student_groups,
                 'room': room.name,
                 'day': day,

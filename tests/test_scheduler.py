@@ -314,6 +314,70 @@ class TestRoomRequirement(unittest.TestCase):
                          "LAB-required course landed in a non-lab room")
 
 
+class TestTeamTeaching(unittest.TestCase):
+    """Team teaching: 1 course, N lecturers — ALL constrained."""
+
+    def test_co_lecturer_conflict_prevents_overlap(self):
+        # C1 team-taught by D001+D002; C2 also taught by D001.
+        # Tight window forces overlap if any lecturer constraint is missing.
+        data = make_data(
+            courses=[course("C1"), course("C2")],
+            enrollments=[
+                {"course_id": "C1", "student_groups": ["IF-3"]},
+                {"course_id": "C2", "student_groups": ["BD-3"]},
+            ],
+            assignments=[
+                {"course_id": "C1", "lecturer_ids": ["D001", "D002"]},
+                {"course_id": "C2", "lecturer_id": "D001"},
+            ],
+            availability=[
+                {"lecturer_id": "D001", "availability": MON_SLOTS_1_3},
+                {"lecturer_id": "D002", "availability": MON_SLOTS_1_3},
+            ],
+        )
+        result = run_scheduler(data)
+        if result.status == "FEASIBLE":
+            self.assertFalse(overlap(result.schedule, "C1", "C2"),
+                             "D001 taught two overlapping courses on a team course")
+
+    def test_second_lecturer_availability_enforced(self):
+        # D001 free MON+WED, D002 free only WEDNESDAY -> intersection = WEDNESDAY.
+        data = make_data(
+            courses=[course("C1")],
+            enrollments=[{"course_id": "C1", "student_groups": ["IF-3"]}],
+            assignments=[
+                {"course_id": "C1", "lecturer_ids": ["D001", "D002"]},
+            ],
+            availability=[
+                {"lecturer_id": "D001",
+                 "availability": {"MONDAY": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+                                  "WEDNESDAY": [1, 2, 3, 4, 5, 6, 7, 8, 9]}},
+                {"lecturer_id": "D002",
+                 "availability": {"WEDNESDAY": [1, 2, 3, 4, 5, 6, 7, 8, 9]}},
+            ],
+        )
+        result = run_scheduler(data)
+        self.assertEqual(result.status, "FEASIBLE")
+        self.assertEqual(entry(result.schedule, "C1")["day"], "WEDNESDAY",
+                         "Co-lecturer availability not enforced")
+
+    def test_extract_keeps_all_lecturer_ids(self):
+        data = make_data(
+            courses=[course("C1")],
+            enrollments=[{"course_id": "C1", "student_groups": ["IF-3"]}],
+            assignments=[
+                {"course_id": "C1", "lecturer_ids": ["D001", "D002"]},
+            ],
+            availability=[{"lecturer_id": "D001",
+                           "availability": {"MONDAY": [1, 2, 3, 4, 5]}}],
+        )
+        result = run_scheduler(data)
+        self.assertEqual(result.status, "FEASIBLE")
+        self.assertEqual(entry(result.schedule, "C1")["lecturer_ids"],
+                         ["D001", "D002"],
+                         "Extracted schedule lost co-lecturer ids")
+
+
 class TestInfeasibleScenario(unittest.TestCase):
     """3.4: deliberately impossible dataset -> INFEASIBLE, not a crash."""
 
