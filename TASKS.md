@@ -456,20 +456,33 @@ validator independen meng-**VALID**ate setiap hasil FEASIBLE).
 Solver timeout 120s. Dataset di-generate dengan load balancing
 (lecturer/group paling ringan diprioritaskan) supaya tidak ada hotspot kapasitas.
 
+Encoding: conflict di-encode sebagai `AddNoOverlap` pada interval waktu absolut
+(bukan pairwise block comparison). Lihat bagian "Constraint Encoding" di PRD.md.
+
 | Courses | Lecturers | Rooms | Constraints | Solve Time | Status   | Valid  |
 |---------|-----------|-------|-------------|------------|----------|--------|
-| 10      | 5         | 4     | 8,248       | 0.69s      | FEASIBLE | VALID  |
-| 25      | 8         | 6     | 91,749      | 8.66s      | FEASIBLE | VALID  |
-| 50      | 12        | 8     | 488,612     | 131.30s    | FEASIBLE | VALID  |
-| 80      | 16        | 8     | 1,397,302   | 165.08s    | UNKNOWN  | -      |
+| 10      | 5         | 4     | 743         | 0.18s      | FEASIBLE | VALID  |
+| 25      | 8         | 6     | 1,586       | 3.84s      | FEASIBLE | VALID  |
+| 50      | 12        | 8     | 3,513       | 120.30s    | FEASIBLE | VALID  |
+| 80      | 16        | 8     | 5,648       | 120.29s    | FEASIBLE | VALID  |
+
+Perbandingan sebelum refactor pairwise → `AddNoOverlap` (commit `d44e353`):
+
+| Courses | Constraints (pairwise) | Constraints (NoOverlap) | Status sebelum | Status sesudah |
+|---------|------------------------|-------------------------|----------------|----------------|
+| 10      | 8,248                  | 743                     | FEASIBLE       | FEASIBLE       |
+| 25      | 91,749                 | 1,586                   | FEASIBLE       | FEASIBLE       |
+| 50      | 488,612                | 3,513                   | FEASIBLE       | FEASIBLE       |
+| 80      | 1,397,302              | 5,648                   | UNKNOWN        | FEASIBLE       |
 
 Catatan:
-- 80 courses = **UNKNOWN** karena kena solver timeout 120s (1.4 juta constraint).
-  Bukan INFEASIBLE — capacity check (`tests/diagnose_bench.py`) menunjukkan semua
-  lecturer/group/room load masih di bawah batas. Naikkan `max_time_in_seconds`
-  di `src/scheduler.py` bila perlu.
-- Constraint count tumbuh ~kuadratik terhadap jumlah courses (room conflict
-  pairwise).
+- 50 dan 80 courses mendekati batas timeout 120s (solusi ketemu, tapi optimalitas
+  belum tentu tercapai). Naikkan `max_time_in_seconds` di `src/scheduler.py`
+  bila perlu hasil optimal.
+- Sebelum refactor, 80 courses = **UNKNOWN** (timeout). Sesudahnya **FEASIBLE**.
+- Constraint tumbuh ~kuadratik terhadap jumlah courses, tapi konstanta jauh lebih
+  kecil karena solver memproses `AddNoOverlap` sebagai struktur native, bukan
+  ratusan ribu clause bool.
 
 ---
 

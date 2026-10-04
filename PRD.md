@@ -445,6 +445,50 @@ A course cannot be split across multiple days.
 
 ---
 
+# 14A. Constraint Encoding (CP-SAT Implementation)
+
+Hard constraints 14.1-14.3 (lecturer, student group, room conflict) MUST be
+encoded using CP-SAT native `AddNoOverlap` on interval variables, NOT pairwise
+bool-clause encoding.
+
+### Timeline model
+
+Absolute time:
+
+    T = day * 10 + offset(slot)
+
+Where:
+
+    morning slot s (1-5)  -> offset s-1   (0..4)
+    afternoon slot s (6-9) -> offset s     (6..9)
+    offset 5 = lunch break, never occupied
+
+One day = 10 timeline units, one week = 60 units. A course with N credits
+becomes ONE interval `[start, start + N)` on this shared timeline.
+
+### Encoding per constraint
+
+- **Lecturer conflict (14.1)**: one interval per course, grouped by lecturer
+  → `AddNoOverlap([...])`
+- **Student group conflict (14.2)**: same interval, grouped by student group
+  → `AddNoOverlap([...])`
+- **Room conflict (14.3)**: one OPTIONAL interval per (course, compatible room),
+  presence bool linked to the course's room assignment variable
+  → `AddNoOverlap([...])` per room
+
+### Why not pairwise
+
+Pairwise encoding (compare every course pair's day + block + room through
+bool clauses) explodes: O(n²) pairs × several clauses each. Measured on the
+benchmark (see TASKS.md section 3.5): 80 courses → 1,397,302 constraints
+pairwise vs 5,648 with `AddNoOverlap`. The pairwise version timed out
+(UNKNOWN); the native version returns FEASIBLE + VALID.
+
+`AddNoOverlap` is handled by CP-SAT's dedicated interval propagator — stronger
+propagation and far fewer clauses than hand-built bool encoding.
+
+---
+
 # 15. Soft Constraints
 
 Soft constraints are preferences rather than absolute restrictions.
