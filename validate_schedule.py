@@ -92,7 +92,7 @@ class ScheduleValidator:
         return ok
 
     def check_consecutive_credits(self) -> bool:
-        """14.6/14.7: N SKS = N consecutive slots, no lunch break crossing."""
+        """14.6/14.7: N SKS = N consecutive slots."""
         ok = True
         for e in self.schedule:
             course = self.data.course_dict[e["course_id"]]
@@ -105,10 +105,6 @@ class ScheduleValidator:
             if sl != list(range(sl[0], sl[0] + len(sl))):
                 self.fail("consecutive",
                           f"{e['course_code']}: slots {sl} not consecutive")
-                ok = False
-            if {5, 6}.issubset(sl):
-                self.fail("lunch",
-                          f"{e['course_code']}: slots {sl} cross lunch break")
                 ok = False
         return ok
 

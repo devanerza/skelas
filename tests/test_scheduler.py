@@ -231,19 +231,18 @@ class TestCrossSemesterConflict(unittest.TestCase):
 
 
 class TestConsecutiveSlots(unittest.TestCase):
-    """14.6/14.7: N SKS = N consecutive slots, no lunch-break crossing."""
+    """14.6/14.7: N SKS = N consecutive slots (no break gap enforced)."""
 
     def test_four_sks_blocks(self):
         self.assertEqual(
             generate_consecutive_blocks(4),
-            [[1, 2, 3, 4], [2, 3, 4, 5], [6, 7, 8, 9]],
+            [[1, 2, 3, 4], [2, 3, 4, 5], [3, 4, 5, 6],
+             [4, 5, 6, 7], [5, 6, 7, 8], [6, 7, 8, 9]],
         )
 
-    def test_no_block_crosses_lunch_break(self):
+    def test_blocks_are_consecutive(self):
         for credits in (2, 3, 4):
             for block in generate_consecutive_blocks(credits):
-                self.assertFalse({5, 6}.issubset(block),
-                                 f"Block {block} crosses lunch break")
                 self.assertEqual(block, list(range(block[0], block[0] + credits)),
                                  f"Block {block} not consecutive")
 
@@ -277,8 +276,8 @@ class TestLecturerAvailability(unittest.TestCase):
         self.assertEqual(entry(result.schedule, "C1")["day"], "WEDNESDAY",
                          "Course scheduled outside lecturer availability")
 
-    def test_lunch_gap_not_available_even_if_lecturer_free(self):
-        # Lecturer free only slot 5 + slot 6 -> no valid 2-SKS block exists
+    def test_slots_5_and_6_form_valid_block(self):
+        # Lecturer free only slots 5+6 -> valid 2-SKS block (no break gap).
         data = make_data(
             courses=[course("C1")],
             enrollments=[{"course_id": "C1", "student_groups": ["IF-3"]}],
@@ -287,8 +286,8 @@ class TestLecturerAvailability(unittest.TestCase):
                            "availability": {"MONDAY": [5, 6]}}],
         )
         result = run_scheduler(data)
-        self.assertEqual(result.status, "INFEASIBLE",
-                         "5+6 are not consecutive, no valid block exists")
+        self.assertEqual(result.status, "FEASIBLE",
+                         "slots 5+6 must form a valid consecutive block")
 
 
 class TestRoomRequirement(unittest.TestCase):

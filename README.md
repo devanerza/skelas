@@ -65,7 +65,7 @@ ruang** yang memenuhi 7 hard constraint:
 3. Ruang tidak boleh dipakai 2 kelas bersamaan
 4. Kelas hanya boleh di slot availability dosen
 5. Ruang harus sesuai tipe (mis. lab komputer butuh COMPUTER_LAB)
-6. N SKS = N slot konsekutif (tanpa melompati jam istirahat)
+6. N SKS = N slot konsekutif (tanpa jeda istirahat — kelas/dosen atur sendiri)
 7. Satu kelas tidak boleh dipotong lintas hari
 
 **Prinsip penting**: konflik mahasiswa ditentukan `student_groups`, bukan
@@ -82,9 +82,7 @@ Setiap kelas jadi satu interval pada timeline absolut:
 ```
 T = day * 10 + offset(slot)
 
-slot pagi 1-5  → offset 0-4
-slot siang 6-9 → offset 6-9
-offset 5       → jam istirahat, tak pernah terisi
+slot s → offset s-1 (slot 1-9 → 0-8, tanpa jeda istirahat)
 ```
 
 1 hari = 10 unit, 1 minggu = 60 unit. Matkul N SKS = interval `[start, start+N)`.
@@ -144,9 +142,10 @@ masih meng-optimize objective, bukan karena cari feasible-nya lama.
 **12 unit test** (`tests/test_scheduler.py`) — semua pass:
 
 - 3 conflict (dosen, ruang, mahasiswa) + 2 negatif (beda kelompok BOLEH overlap)
+- Team teaching (2 dosen per matkul: konflik + availability dosen ke-2)
 - Konflik lintas-semester (IF-3 vs IF-5 yang sama-sama diikut IF-5)
-- Slot konsekutif 4 SKS (valid [1-4], [2-5], [6-9]; tak boleh lintas istirahat)
-- Availability dosen (hari saja + gap istirahat → INFEASIBLE)
+- Slot konsekutif 4 SKS (valid [1-4]..[6-9]; lintas 5→6 pun valid)
+- Availability dosen (hari saja → INFEASIBLE)
 - Tipe ruang (kelas lab → COMPUTER_LAB)
 - Skenario INFEASIBLE (10 matkul × 4 SKS, 1 ruang → INFEASIBLE)
 

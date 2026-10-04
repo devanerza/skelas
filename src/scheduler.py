@@ -89,7 +89,7 @@ class CourseScheduler:
         user does not have to guess which of the generic causes applies.
         """
         findings = []
-        week_slots = len(DAYS) * 9  # 5 morning + 4 afternoon per day
+        week_slots = len(DAYS) * 9  # 9 slots per day
 
         # 1. Courses whose lecturer availability leaves no/few valid blocks
         for course in self.data.courses:
@@ -192,7 +192,7 @@ class CourseScheduler:
             blocks = generate_consecutive_blocks(course.credits)
             day = model.NewIntVar(0, len(DAYS) - 1, f'{course.id}_pday')
             block_idx = model.NewIntVar(0, len(blocks) - 1, f'{course.id}_pblock')
-            offsets = [b[0] - 1 if b[0] <= 5 else b[0] for b in blocks]
+            offsets = [b[0] - 1 for b in blocks]
             off = model.NewIntVar(0, 9, f'{course.id}_poff')
             model.AddElement(block_idx, offsets, off)
             start = model.NewIntVar(0, 10 * len(DAYS) - 1, f'{course.id}_pstart')
@@ -227,9 +227,7 @@ class CourseScheduler:
 
         Timeline encoding (instead of pairwise block-comparison):
         absolute time T = day * 10 + offset(slot), where
-        - morning slot s -> offset s-1 (slots 1-5 -> 0..4)
-        - afternoon slot s -> offset s   (slots 6-9 -> 6..9)
-        - offset 5 = lunch, never occupied by any block
+        slot s -> offset s-1 (slots 1-9 -> 0..8)
         Course duration == credits, so each course becomes ONE interval
         on a shared 60-unit timeline (6 days x 10 units).
         """
@@ -249,7 +247,7 @@ class CourseScheduler:
             room = self.model.NewIntVar(0, len(compatible_rooms) - 1, f'{course_id}_room')
 
             # Absolute start on shifted timeline
-            offsets = [b[0] - 1 if b[0] <= 5 else b[0] for b in blocks]
+            offsets = [b[0] - 1 for b in blocks]
             off = self.model.NewIntVar(0, 9, f'{course_id}_off')
             self.model.AddElement(block_idx, offsets, off)
             day10 = self.model.NewIntVar(0, 10 * (len(DAYS) - 1), f'{course_id}_day10')

@@ -84,7 +84,7 @@ scheduler/
 ]
 ```
 
-**Important**: Slot 1-5 consecutive, slot 6-9 consecutive, tetapi slot 5→6 NOT consecutive (lunch break).
+**Important**: Slot 1-9 satu rentang konsekutif; tidak ada jeda istirahat yang dipaksakan (kelas/dosen atur break sendiri).
 
 ### 1.3 Define Courses (data/courses.json)
 
@@ -250,8 +250,10 @@ Example for 4 SKS:
 [
   [1,2,3,4],  # valid
   [2,3,4,5],  # valid
+  [3,4,5,6],  # valid (slot 5→6 tidak dianggap jeda)
+  [4,5,6,7],  # valid
+  [5,6,7,8],  # valid
   [6,7,8,9]   # valid
-  # [3,4,5,6] INVALID (crosses lunch break)
 ]
 ```
 
@@ -385,8 +387,7 @@ Solve time: 2.31 seconds
 
 #### Test 6: Consecutive Slots for 4 SKS
 ```python
-# Valid: [1,2,3,4] or [6,7,8,9]
-# Invalid: [3,4,5,6] (crosses lunch break)
+# Valid: [1,2,3,4] .. [6,7,8,9] (semua rentang konsekutif 1-9)
 ```
 
 #### Test 7: Lecturer Availability

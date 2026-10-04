@@ -459,9 +459,8 @@ Absolute time:
 
 Where:
 
-    morning slot s (1-5)  -> offset s-1   (0..4)
-    afternoon slot s (6-9) -> offset s     (6..9)
-    offset 5 = lunch break, never occupied
+    slot s (1-9) -> offset s-1   (0..8)
+    no reserved lunch-break unit (classes/lecturers handle break times)
 
 One day = 10 timeline units, one week = 60 units. A course with N credits
 becomes ONE interval `[start, start + N)` on this shared timeline.
