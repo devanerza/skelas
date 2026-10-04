@@ -55,10 +55,5 @@
   { "course_id": "MK054", "student_groups": ["TL-7"] },
   { "course_id": "MK055", "student_groups": ["IF-3", "BD-3"] },
   { "course_id": "MK056", "student_groups": [] },
-  { "course_id": "MK057", "student_groups": ["IF-5", "BD-5", "TL-5"] },
-  { "course_id": "MK058", "student_groups": ["IF-5", "BD-5", "TL-5"] },
-  { "course_id": "MK059", "student_groups": ["IF-5", "BD-5", "TL-5"] },
-  { "course_id": "MK060", "student_groups": ["IF-5", "BD-5", "TL-5"] },
-  { "course_id": "MK061", "student_groups": ["TL-7"] },
-  { "course_id": "MK062", "student_groups": ["IF-1", "BD-1"] }
+  { "course_id": "MK061", "student_groups": ["TL-7"] }
 ]
