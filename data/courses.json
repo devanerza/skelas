@@ -395,7 +395,7 @@
     "id": "MK050",
     "code": "AKH",
     "name": "Perencanaan dan Pengendalian Sistem Logistik",
-    "curriculum_semester": 3,
+    "curriculum_semester": 5,
     "credits": 3,
     "room_type_required": "CLASSROOM"
   },
@@ -427,7 +427,7 @@
     "id": "MK054",
     "code": "YSF",
     "name": "Manajemen Rantai Pasok",
-    "curriculum_semester": 5,
+    "curriculum_semester": 7,
     "credits": 3,
     "room_type_required": "CLASSROOM"
   },
@@ -443,7 +443,7 @@
     "id": "MK056",
     "code": "CIL",
     "name": "Desain Grafis, Video dan Photografi",
-    "curriculum_semester": 5,
+    "curriculum_semester": 3,
     "credits": 3,
     "room_type_required": "CLASSROOM"
   },
@@ -452,6 +452,14 @@
     "code": "26-IF",
     "name": "Pendidikan Agama",
     "curriculum_semester": 1,
+    "credits": 2,
+    "room_type_required": "CLASSROOM"
+  },
+  {
+    "id": "MK062",
+    "code": "26-BD-TL",
+    "name": "Metode Penelitian Ilmiah (BD & TL)",
+    "curriculum_semester": 7,
     "credits": 2,
     "room_type_required": "CLASSROOM"
   }
