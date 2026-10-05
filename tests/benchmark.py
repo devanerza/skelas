@@ -121,7 +121,7 @@ def run_bench(n_courses, n_lecturers, n_rooms):
     n_constraints = int(m.group(1)) if m else 0
 
     valid = "-"
-    if result.status == "FEASIBLE":
+    if result.status in ("FEASIBLE", "PARTIAL"):
         with redirect_stdout(io.StringIO()):
             ok = ScheduleValidator(data, result.schedule).validate()
         valid = "VALID" if ok else "INVALID"
@@ -146,7 +146,7 @@ def main():
         print(f"{n_c:>8} {n_l:>5} {n_r:>5} {n_constr:>7} {result.solve_time:>7.2f}s "
               f"{result.status:>11} {valid:>7}")
         rows.append((n_c, n_l, n_r, n_constr, result, valid))
-        if result.status not in ("FEASIBLE", "INFEASIBLE"):
+        if result.status not in ("FEASIBLE", "PARTIAL", "INFEASIBLE"):
             print(f"  !! {result.message}")
 
     return rows

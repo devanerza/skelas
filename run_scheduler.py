@@ -11,28 +11,28 @@ from src.scheduler import CourseScheduler
 
 def main():
     print("=" * 60)
-    print("Academic Course Scheduling System")
+    print("Sistem Penjadwalan Mata Kuliah")
     print("=" * 60)
     print()
     
-    print("Loading data...")
+    print("Memuat data...")
     try:
         data = SchedulerData("data")
-        print(f"✓ Loaded {len(data.courses)} courses")
-        print(f"✓ Loaded {len(data.lecturers)} lecturers")
-        print(f"✓ Loaded {len(data.rooms)} rooms")
-        print(f"✓ Loaded {len(data.student_groups)} student groups")
+        print(f"✓ {len(data.courses)} mata kuliah")
+        print(f"✓ {len(data.lecturers)} dosen")
+        print(f"✓ {len(data.rooms)} ruangan")
+        print(f"✓ {len(data.student_groups)} kelompok mahasiswa")
         print()
     except Exception as e:
-        print(f"❌ Failed to load data: {e}")
+        print(f"❌ Gagal memuat data: {e}")
         return 1
     
-    print("Initializing scheduler...")
+    print("Inisialisasi scheduler...")
     scheduler = CourseScheduler(data)
 
     flagged = [ta for ta in data.teaching_assignments if ta.needs_review]
     if flagged:
-        print("\n⚠ Assignments flagged needs_review (edit data/teaching_assignments.json):")
+        print("\n⚠ Penugasan ditandai perlu ditinjau (edit data/teaching_assignments.json):")
         for ta in flagged:
             course = data.course_dict.get(ta.course_id)
             name = course.name if course else ta.course_id
@@ -48,23 +48,26 @@ def main():
     print()
     print("=" * 60)
     print(f"Status: {result.status}")
-    print(f"Solve time: {result.solve_time:.2f}s")
+    print(f"Waktu penyelesaian: {result.solve_time:.2f} detik")
     print("=" * 60)
     print()
     
-    if result.status == "FEASIBLE":
-        print("✅ Valid schedule found!\n")
+    if result.status in ("FEASIBLE", "PARTIAL"):
+        if result.status == "PARTIAL":
+            print(f"⚠ {result.message}\n")
+        else:
+            print("✅ Jadwal valid ditemukan!\n")
         
-        # Export for independent validation: python validate_schedule.py schedule.json
+        # Ekspor untuk validasi independen: python validate_schedule.py schedule.json
         out_path = Path(__file__).parent / "schedule.json"
         out_path.write_text(
             json.dumps(result.schedule, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
-        print(f"Exported: {out_path.name}")
-        print("Validate: python validate_schedule.py schedule.json\n")
+        print(f"Diekspor: {out_path.name}")
+        print("Validasi: python validate_schedule.py schedule.json\n")
         
-        # Group by day
+        # Kelompokkan per hari
         by_day = {}
         for entry in result.schedule:
             day = entry['day']
@@ -72,28 +75,43 @@ def main():
                 by_day[day] = []
             by_day[day].append(entry)
         
-        # Print schedule
+        # Cetak jadwal
+        hari_id = {"MONDAY": "SENIN", "TUESDAY": "SELASA", "WEDNESDAY": "RABU",
+                   "THURSDAY": "KAMIS", "FRIDAY": "JUMAT", "SATURDAY": "SABTU"}
         for day in ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]:
             if day not in by_day:
                 continue
             
-            print(f"\n{day}")
+            print(f"\n{hari_id[day]}")
             print("-" * 60)
             
-            # Sort by start slot
+            # Urutkan per slot awal
             entries = sorted(by_day[day], key=lambda x: x['start_slot'])
             
             for entry in entries:
                 print(f"{entry['time']:15} | {entry['room']:15} | {entry['course_code']} - {entry['course_name']}")
-                print(f"{' ':15} | {' ':15} | Lecturer: {entry['lecturer']}")
-                print(f"{' ':15} | {' ':15} | Groups: {', '.join(entry['student_groups'])}")
+                print(f"{' ':15} | {' ':15} | Dosen: {entry['lecturer']}")
+                print(f"{' ':15} | {' ':15} | Kelompok: {', '.join(entry['student_groups'])}")
                 print()
+        
+        if result.dropped:
+            print("\n" + "=" * 60)
+            print(f"DILEWATI (tidak feasible): {len(result.dropped)} mata kuliah")
+            print("=" * 60)
+            for entry in result.dropped:
+                print(f"  ✗ {entry['course_code']} - {entry['course_name']}")
+                print(f"    Alasan: {entry['reason']}")
+                print()
+            print("Diagnosis (perbaiki file data, lalu jalankan ulang):")
+            for i, finding in enumerate(scheduler.diagnose_dropped(result.dropped), 1):
+                print(f"{i}. {finding}")
+            print()
         
         return 0
     
     elif result.status == "INFEASIBLE":
         print(f"❌ {result.message}")
-        print("\nDiagnosis (concrete blockers found in your data):")
+        print("\nDiagnosis (penyebab konkret dari data Anda):")
         for i, finding in enumerate(scheduler.diagnose(), 1):
             print(f"{i}. {finding}")
         return 1

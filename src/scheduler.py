@@ -2,22 +2,37 @@
 Course Scheduling Engine using OR-Tools CP-SAT
 """
 from ortools.sat.python import cp_model
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List
 import time
 
 from .data_loader import SchedulerData
-from .utils import generate_consecutive_blocks
+from .utils import generate_consecutive_blocks, slots_overlap
 
 
 DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
 
 
 class ScheduleResult:
-    def __init__(self, status: str, solve_time: float, schedule: List[Dict] = None, message: str = ""):
+    def __init__(self, status: str, solve_time: float, schedule: List[Dict] = None,
+                 message: str = "", dropped: List[Dict] = None):
         self.status = status
         self.solve_time = solve_time
         self.schedule = schedule or []
         self.message = message
+        self.dropped = dropped or []
+
+
+class _ProgressCallback(cp_model.CpSolverSolutionCallback):
+    """Prints each improving solution so long solves show life."""
+
+    def __init__(self):
+        super().__init__()
+        self._n = 0
+
+    def on_solution_callback(self):
+        self._n += 1
+        print(f"  solusi #{self._n} (objektif {self.ObjectiveValue():.0f})",
+              flush=True)
 
 
 class CourseScheduler:
@@ -25,97 +40,188 @@ class CourseScheduler:
         self.data = data
         self.model = cp_model.CpModel()
         self.vars = {}
-        
+
     def schedule(self) -> ScheduleResult:
-        """Main scheduling function"""
+        """Build the reified model: every course gets a `sched` bool.
+        Objective maximizes scheduled courses first — the solver itself
+        decides which courses must be skipped when all cannot fit."""
         start_time = time.time()
-        
-        print("Building decision variables...")
+
+        print("Membuat variabel keputusan...")
         self._create_variables()
-        
-        print("Adding constraints...")
-        self._add_consecutive_slot_constraints()
-        
-        print("  - Lecturer conflict constraints...")
+
+        print("Menambahkan batasan...")
+        print("  - Batasan konflik dosen...")
         self._add_lecturer_conflict_constraints()
-        
-        print("  - Student group conflict constraints...")
+
+        print("  - Batasan konflik kelompok mahasiswa...")
         self._add_student_group_conflict_constraints()
-        
-        print("  - Room conflict constraints...")
+
+        print("  - Batasan konflik ruangan...")
         self._add_room_conflict_constraints()
-        
-        print("  - Lecturer availability constraints...")
+
+        print("  - Batasan ketersediaan dosen...")
         self._add_lecturer_availability_constraints()
-        
-        print("  - Room requirement constraints...")
-        self._add_room_requirement_constraints()
-        
-        print("  - Optimization objective (compact schedule)...")
+
+        print("  - Fungsi objektif (maksimalkan yang terjadwal, lalu padatkan)...")
         self._add_objective()
-        
-        print(f"Total constraints: {len(self.model.Proto().constraints)}")
-        print("Solving...")
+
+        print(f"Total batasan: {len(self.model.Proto().constraints)}", flush=True)
+        print("Memecahkan (berbatas waktu, solusi terbaik tetap ditampilkan)...",
+              flush=True)
         solver = cp_model.CpSolver()
-        solver.parameters.max_time_in_seconds = 120.0
-        status = solver.Solve(self.model)
-        
+        solver.parameters.max_time_in_seconds = 30.0
+        status = solver.Solve(self.model, _ProgressCallback())
+
         solve_time = time.time() - start_time
-        
-        if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-            schedule = self._extract_solution(solver)
-            return ScheduleResult(
-                status="FEASIBLE",
-                solve_time=solve_time,
-                schedule=schedule
-            )
-        elif status == cp_model.INFEASIBLE:
+
+        if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            return self._build_result(solver, solve_time)
+        return ScheduleResult(
+            status="UNKNOWN",
+            solve_time=solve_time,
+            message="Solver tidak menemukan solusi dalam waktu yang tersedia"
+        )
+
+    def _build_result(self, solver: cp_model.CpSolver,
+                      solve_time: float) -> ScheduleResult:
+        """Map solved model onto FEASIBLE / PARTIAL / INFEASIBLE and
+        explain every skipped course against the produced schedule."""
+        scheduled_ids = [c.id for c in self.data.courses
+                         if solver.Value(self.vars[c.id]['sched'])]
+        dropped_ids = [c.id for c in self.data.courses
+                       if c.id not in scheduled_ids]
+
+        if not scheduled_ids:
             return ScheduleResult(
                 status="INFEASIBLE",
                 solve_time=solve_time,
-                message="No valid schedule found"
-            )
-        else:
-            return ScheduleResult(
-                status="UNKNOWN",
-                solve_time=solve_time,
-                message="Solver did not find a solution in time"
-            )
-    
-    def diagnose(self) -> List[str]:
-        """Concrete, data-driven findings when the model is infeasible.
+                message="Tidak ada mata kuliah yang bisa dijadwalkan dengan batasan saat ini")
 
-        Each finding names the offending entity and the file to edit, so the
-        user does not have to guess which of the generic causes applies.
+        schedule = self._extract_solution(solver, scheduled_ids)
+        dropped = []
+        for course_id in dropped_ids:
+            course = self.data.course_dict[course_id]
+            dropped.append({
+                'course_id': course_id,
+                'course_code': course.code,
+                'course_name': course.name,
+                'reason': self._drop_reason(course_id, schedule),
+            })
+
+        if dropped:
+            message = (f"Jadwal parsial: {len(schedule)} dari "
+                       f"{len(self.data.courses)} mata kuliah terjadwal, "
+                       f"{len(dropped)} dilewati karena tidak feasible")
+        else:
+            message = "Jadwal valid ditemukan"
+        return ScheduleResult(
+            status="PARTIAL" if dropped else "FEASIBLE",
+            solve_time=solve_time,
+            schedule=schedule,
+            message=message,
+            dropped=dropped)
+
+    @staticmethod
+    def _slots_free(day: str, block: List[int], occupied: List[Dict]) -> bool:
+        return not any(
+            e['day'] == day and
+            slots_overlap(list(range(block[0], block[-1] + 1)),
+                          list(range(e['start_slot'], e['end_slot'] + 1)))
+            for e in occupied)
+
+    def _drop_reason(self, course_id: str, scheduled: List[Dict]) -> str:
+        """Why this course could not be placed alongside the produced schedule."""
+        course = self.data.course_dict[course_id]
+        blocks = generate_consecutive_blocks(course.credits)
+
+        if not self.data.get_compatible_rooms(course.room_type_required):
+            return (f"Tidak ada ruangan bertipe {course.room_type_required} — "
+                    "tambahkan di data/rooms.json")
+
+        lecturers = self.data.get_course_lecturers(course_id)
+        options = [
+            (d, b) for d in DAYS for b in blocks
+            if all(d not in (self.data.get_lecturer_availability(l) or {})
+                   or set(b).issubset(
+                       set(self.data.get_lecturer_availability(l)[d]))
+                   for l in lecturers)]
+        if not options:
+            name = (self.data.lecturer_dict[lecturers[0]].name
+                    if lecturers else "(tanpa dosen)")
+            return (f"Ketersediaan {name} tidak menyisakan blok "
+                    f"{course.credits} SKS — perluas "
+                    "data/lecturer_availability.json")
+
+        for lecturer_id in lecturers:
+            occupied = [e for e in scheduled
+                        if lecturer_id in e.get('lecturer_ids', [])]
+            if occupied and not any(self._slots_free(d, b, occupied)
+                                    for d, b in options):
+                name = self.data.lecturer_dict[lecturer_id].name
+                return (f"{name} sudah penuh di semua slot tersedia "
+                        "oleh mata kuliah yang terjadwal")
+
+        for group in self.data.get_course_student_groups(course_id):
+            occupied = [e for e in scheduled
+                        if group in e.get('student_groups', [])]
+            if occupied and not any(self._slots_free(d, b, occupied)
+                                    for d, b in options):
+                return (f"Kelompok {group} tidak punya jendela bebas "
+                        f"{course.credits} SKS tersisa minggu ini")
+
+        room_ok = False
+        for room in self.data.get_compatible_rooms(course.room_type_required):
+            occupied = [e for e in scheduled if e['room'] == room.name]
+            if any(self._slots_free(d, b, occupied) for d, b in options):
+                room_ok = True
+                break
+        if not room_ok:
+            return (f"Semua ruangan tipe {course.room_type_required} terblokir "
+                    "di setiap slot valid — tambah ruangan di data/rooms.json")
+
+        return ("Bentrok dengan mata kuliah yang sudah terjadwal di semua "
+                "(hari, blok) valid — terhambat kombinasi batasan")
+
+    def diagnose_dropped(self, dropped: List[Dict]) -> List[str]:
+        """Temuan per mata kuliah yang dilewati pada penjadwalan parsial."""
+        return [f"{e['course_name']}: {e['reason']}" for e in dropped]
+
+    def diagnose(self) -> List[str]:
+        """Temuan konkret berbasis data ketika model tidak feasible.
+
+        Setiap temuan menyebut nama pelaku dan file yang perlu diedit,
+        sehingga pengguna tidak perlu menebak penyebab umumnya.
         """
         findings = []
-        week_slots = len(DAYS) * 9  # 9 slots per day
+        week_slots = len(DAYS) * 9  # 9 slot per hari
 
-        # 1. Courses whose lecturer availability leaves no/few valid blocks
+        # 1. Mata kuliah yang ketersediaan dosen menyisakan blok tidak valid
         for course in self.data.courses:
             for lecturer_id in self.data.get_course_lecturers(course.id):
                 availability = self.data.get_lecturer_availability(lecturer_id)
                 if not availability:
                     continue
+                lecturer_name = self.data.lecturer_dict[lecturer_id].name
                 blocks = generate_consecutive_blocks(course.credits)
                 options = sum(
                     1 for day_name in DAYS
                     if day_name in availability
                     for block in blocks
-                    if set(block).issubset(set(availability[day_name]))
-                )
+                    if set(block).issubset(set(availability[day_name])))
                 if options == 0:
                     findings.append(
-                        f"{course.code} ({course.id}): NO valid slot — lecturer {lecturer_id} "
-                        f"availability rules out every {course.credits}-SKS block. Fix: widen "
-                        "data/lecturer_availability.json or reassign in data/teaching_assignments.json")
+                        f"{course.name}: TIDAK ADA slot valid — ketersediaan dosen "
+                        f"{lecturer_name} meniadakan semua blok {course.credits} SKS. "
+                        "Perbaiki: perluas data/lecturer_availability.json atau "
+                        "ganti dosen di data/teaching_assignments.json")
                 elif options <= 4:
                     findings.append(
-                        f"{course.code} ({course.id}): only {options} valid (day, block) options "
-                        f"with lecturer {lecturer_id} availability — high conflict risk. Fix: widen "
-                        "data/lecturer_availability.json")
+                        f"{course.name}: hanya {options} opsi (hari, blok) valid dari "
+                        f"ketersediaan dosen {lecturer_name} — risiko bentrok tinggi. "
+                        "Perbaiki: perluas data/lecturer_availability.json")
 
-        # 2. Lecturer load vs availability (static check, then solver probe)
+        # 2. Beban dosen vs ketersediaan (cek statis, lalu probe solver)
         lecturer_courses = {}
         for course in self.data.courses:
             for lecturer_id in self.data.get_course_lecturers(course.id):
@@ -125,22 +231,25 @@ class CourseScheduler:
             availability = self.data.get_lecturer_availability(lecturer_id) or {}
             if not availability or len(courses) < 2:
                 continue
+            lecturer_name = self.data.lecturer_dict[lecturer_id].name
             free_slots = sum(len(v) for v in availability.values())
             load = sum(c.credits for c in courses)
             if load > free_slots:
                 findings.append(
-                    f"Lecturer {lecturer_id}: teaches {load} SKS but only {free_slots} free "
-                    f"slots ({len(availability)} day(s)) — impossible even before conflicts. "
-                    "Fix: widen data/lecturer_availability.json or reassign a course in "
-                    "data/teaching_assignments.json")
+                    f"Dosen {lecturer_name}: mengajar {load} SKS tapi hanya punya "
+                    f"{free_slots} slot bebas ({len(availability)} hari) — mustahil "
+                    "sudah sebelum ada bentrok. Perbaiki: perluas "
+                    "data/lecturer_availability.json atau alihkan satu mata kuliah "
+                    "di data/teaching_assignments.json")
             elif self._probe_lecturer_fit(courses, availability):
                 findings.append(
-                    f"Lecturer {lecturer_id}: {load} SKS in {free_slots} free slots cannot be "
-                    "packed as consecutive blocks — provably infeasible alone. Fix: widen "
-                    "data/lecturer_availability.json or reassign a course in "
-                    "data/teaching_assignments.json")
+                    f"Dosen {lecturer_name}: {load} SKS dalam {free_slots} slot bebas "
+                    "tidak bisa disusun sebagai blok berturut-turut — terbukti tidak "
+                    "feasible sendirian. Perbaiki: perluas "
+                    "data/lecturer_availability.json atau alihkan satu mata kuliah "
+                    "di data/teaching_assignments.json")
 
-        # 3. Student group load
+        # 3. Beban kelompok mahasiswa
         group_load = {}
         for course in self.data.courses:
             for group in self.data.get_course_student_groups(course.id):
@@ -148,11 +257,11 @@ class CourseScheduler:
         for group, load in sorted(group_load.items()):
             if load > week_slots - 6:
                 findings.append(
-                    f"Student group {group}: {load} SKS out of {week_slots} weekly slots — "
-                    "almost no slack for conflicts. Fix: move a course to another group in "
-                    "data/course_enrollments.json")
+                    f"Kelompok {group}: {load} SKS dari {week_slots} slot mingguan — "
+                    "sisa ruang sangat sempit untuk bentrok. Perbaiki: pindahkan satu "
+                    "mata kuliah ke kelompok lain di data/course_enrollments.json")
 
-        # 4. Room capacity
+        # 4. Kapasitas ruangan
         type_demand = {}
         for course in self.data.courses:
             type_demand[course.room_type_required] = \
@@ -162,25 +271,28 @@ class CourseScheduler:
             capacity = len(rooms) * week_slots
             if not rooms:
                 findings.append(
-                    f"No room of type {room_type} exists. Fix: add one in data/rooms.json")
+                    f"Tidak ada ruangan bertipe {room_type}. "
+                    "Perbaiki: tambahkan di data/rooms.json")
             elif demand > capacity:
                 findings.append(
-                    f"Rooms [{room_type}]: {demand} SKS demand EXCEEDS {capacity} slot capacity "
-                    f"({len(rooms)} room(s)). Fix: add rooms in data/rooms.json or relax "
-                    "room_type_required in data/courses.json")
+                    f"Ruangan [{room_type}]: permintaan {demand} SKS MELEBIHI "
+                    f"kapasitas {capacity} slot ({len(rooms)} ruangan). Perbaiki: "
+                    "tambah ruangan di data/rooms.json atau longgarkan "
+                    "room_type_required di data/courses.json")
             elif demand > capacity * 0.9:
                 findings.append(
-                    f"Rooms [{room_type}]: {demand} SKS vs {capacity} slot capacity "
-                    f"({len(rooms)} room(s)) — near capacity, fragmentation likely breaks it. "
-                    "Fix: add a room in data/rooms.json")
+                    f"Ruangan [{room_type}]: permintaan {demand} SKS vs kapasitas "
+                    f"{capacity} slot ({len(rooms)} ruangan) — hampir penuh, "
+                    "fragmentasi mudah membuatnya gagal. Perbaiki: tambah satu "
+                    "ruangan di data/rooms.json")
 
         if not findings:
             findings.append(
-                "No single lecturer, group, or room violates a constraint alone — the conflict "
-                "comes from their combination. Bisect by relaxing one family at a time: widen "
-                "all availability in data/lecturer_availability.json (or clear "
-                "room_type_required in data/courses.json), re-run, and see which change makes "
-                "it feasible.")
+                "Tidak ada dosen, kelompok, atau ruangan yang melanggar batasan "
+                "sendirian — bentrok berasal dari kombinasinya. Uji satu per satu: "
+                "longgarkan seluruh ketersediaan di data/lecturer_availability.json "
+                "(atau kosongkan room_type_required di data/courses.json), jalankan "
+                "ulang, dan lihat perubahan mana yang membuatnya feasible.")
         return findings
 
     def _probe_lecturer_fit(self, courses: List, availability: Dict) -> bool:
@@ -230,6 +342,9 @@ class CourseScheduler:
         slot s -> offset s-1 (slots 1-9 -> 0..8)
         Course duration == credits, so each course becomes ONE interval
         on a shared 60-unit timeline (6 days x 10 units).
+
+        Each course also gets a `sched` bool: 1 = include in schedule,
+        0 = skipped (all its constraints are guarded by it).
         """
         for course in self.data.courses:
             course_id = course.id
@@ -242,6 +357,7 @@ class CourseScheduler:
             if not compatible_rooms:
                 raise ValueError(f"No compatible rooms for course {course_id} requiring {course.room_type_required}")
 
+            sched = self.model.NewBoolVar(f'{course_id}_sched')
             day = self.model.NewIntVar(0, len(DAYS) - 1, f'{course_id}_day')
             block_idx = self.model.NewIntVar(0, len(blocks) - 1, f'{course_id}_block')
             room = self.model.NewIntVar(0, len(compatible_rooms) - 1, f'{course_id}_room')
@@ -257,20 +373,25 @@ class CourseScheduler:
             end = self.model.NewIntVar(0, 10 * len(DAYS) + 5, f'{course_id}_end')
             self.model.Add(end == start + course.credits)
 
-            # One interval per course (for lecturer / student group NoOverlap)
-            interval = self.model.NewIntervalVar(
-                start, course.credits, end, f'{course_id}_iv')
+            # One OPTIONAL interval per course (presence = sched): skipped
+            # courses never collide in lecturer/group NoOverlap.
+            interval = self.model.NewOptionalIntervalVar(
+                start, course.credits, end, sched, f'{course_id}_iv')
 
-            # One OPTIONAL interval per compatible room (presence = room assignment)
+            # One OPTIONAL interval per compatible room (presence = both
+            # scheduled AND assigned to this room)
             room_intervals = {}
             for idx, r in enumerate(compatible_rooms):
                 pres = self.model.NewBoolVar(f'{course_id}_uses_{r.id}')
+                self.model.Add(pres <= sched)
                 self.model.Add(room == idx).OnlyEnforceIf(pres)
-                self.model.Add(room != idx).OnlyEnforceIf(pres.Not())
+                # When scheduled: pres <-> (room == idx). When skipped: free.
+                self.model.Add(room != idx).OnlyEnforceIf([pres.Not(), sched])
                 room_intervals[r.id] = self.model.NewOptionalIntervalVar(
                     start, course.credits, end, pres, f'{course_id}_iv_{r.id}')
 
             self.vars[course_id] = {
+                'sched': sched,
                 'day': day,
                 'block_idx': block_idx,
                 'room': room,
@@ -279,16 +400,13 @@ class CourseScheduler:
                 'interval': interval,
                 'room_intervals': room_intervals,
             }
-    
-    def _add_consecutive_slot_constraints(self):
-        """Consecutive slots are already enforced by block generation"""
-        pass
-    
+
     def _add_lecturer_conflict_constraints(self):
         """Lecturer cannot teach two courses at the same time (AddNoOverlap).
 
-        Team teaching: every lecturer of a course gets that course's interval,
-        so all co-lecturers are conflict-checked against their other courses.
+        Team teaching: every lecturer of a course gets that course's optional
+        interval, so all co-lecturers are conflict-checked against their
+        other courses. Skipped courses (sched=0) drop out of the NoOverlap.
         """
         lecturer_courses = {}
         for course in self.data.courses:
@@ -327,7 +445,7 @@ class CourseScheduler:
                 continue
             self.model.AddNoOverlap(
                 [self.vars[c]['room_intervals'][room_id] for c in course_ids])
-    
+
     def _add_lecturer_availability_constraints(self):
         """Course can only be scheduled during ALL its lecturers' available time"""
         for course in self.data.courses:
@@ -340,14 +458,16 @@ class CourseScheduler:
             return
 
         course_id = course.id
+        sched = self.vars[course_id]['sched']
         blocks = self.vars[course_id]['blocks']
         suffix = f'_{lecturer_id}'
 
         # For each (day, block) combination, check if lecturer is available
         for day_idx, day_name in enumerate(DAYS):
             if day_name not in availability:
-                # Lecturer not available on this day
-                self.model.Add(self.vars[course_id]['day'] != day_idx)
+                # Lecturer not available on this day (only when scheduled)
+                self.model.Add(self.vars[course_id]['day'] != day_idx) \
+                    .OnlyEnforceIf(sched)
             else:
                 available_slots = set(availability[day_name])
 
@@ -358,77 +478,86 @@ class CourseScheduler:
                         is_this_day = self.model.NewBoolVar(f'{course_id}_day{day_idx}{suffix}')
                         is_this_block = self.model.NewBoolVar(f'{course_id}_block{block_idx}{suffix}')
 
-                        self.model.Add(self.vars[course_id]['day'] == day_idx).OnlyEnforceIf(is_this_day)
-                        self.model.Add(self.vars[course_id]['day'] != day_idx).OnlyEnforceIf(is_this_day.Not())
-                        self.model.Add(self.vars[course_id]['block_idx'] == block_idx).OnlyEnforceIf(is_this_block)
-                        self.model.Add(self.vars[course_id]['block_idx'] != block_idx).OnlyEnforceIf(is_this_block.Not())
+                        # Deactivated entirely when the course is skipped
+                        self.model.Add(self.vars[course_id]['day'] == day_idx) \
+                            .OnlyEnforceIf([is_this_day, sched])
+                        self.model.Add(self.vars[course_id]['day'] != day_idx) \
+                            .OnlyEnforceIf([is_this_day.Not(), sched])
+                        self.model.Add(self.vars[course_id]['block_idx'] == block_idx) \
+                            .OnlyEnforceIf([is_this_block, sched])
+                        self.model.Add(self.vars[course_id]['block_idx'] != block_idx) \
+                            .OnlyEnforceIf([is_this_block.Not(), sched])
 
                         # Cannot be both this day and this block
-                        self.model.AddBoolOr([is_this_day.Not(), is_this_block.Not()])
-    
+                        self.model.AddBoolOr([is_this_day.Not(), is_this_block.Not()]) \
+                            .OnlyEnforceIf(sched)
+
     def _add_objective(self):
         """
-        Minimize schedule span:
-        1. Number of distinct days used (fewer days = more compact week)
-        2. Total start slot index (earlier starts within used days)
+        1. Maximize the number of scheduled courses (dominant term)
+        2. Minimize schedule span: distinct days used, earlier days/slots
         """
-        # Day used: day_used[d] = 1 if any course scheduled on day d
-        course_ids = [c.id for c in self.data.courses]
+        course_ids = list(self.vars.keys())
+        sched_vars = [self.vars[c]['sched'] for c in course_ids]
+
+        # Day used: day_used[d] = 1 if any scheduled course uses day d
         day_used = []
         for d in range(len(DAYS)):
             is_used = self.model.NewBoolVar(f'day_{d}_used')
-            # is_used == 1 iff at least one course uses day d
             course_on_day = []
             for c in course_ids:
                 on_day = self.model.NewBoolVar(f'{c}_on_day_{d}')
-                self.model.Add(self.vars[c]['day'] == d).OnlyEnforceIf(on_day)
-                self.model.Add(self.vars[c]['day'] != d).OnlyEnforceIf(on_day.Not())
+                self.model.Add(self.vars[c]['day'] == d).OnlyEnforceIf(
+                    [on_day, self.vars[c]['sched']])
+                self.model.Add(self.vars[c]['day'] != d).OnlyEnforceIf(
+                    [on_day.Not(), self.vars[c]['sched']])
                 course_on_day.append(on_day)
-            
+
             self.model.AddBoolOr(course_on_day).OnlyEnforceIf(is_used)
-            self.model.AddBoolAnd([c.Not() for c in course_on_day]).OnlyEnforceIf(is_used.Not())
+            self.model.AddBoolAnd([c.Not() for c in course_on_day]) \
+                .OnlyEnforceIf(is_used.Not())
             day_used.append(is_used)
-        
+
         # Earlier starts: block_idx already ordered morning-first (idx 0 = slot 1)
         start_cost = [self.vars[c]['block_idx'] for c in course_ids]
-        
+
         # Earlier days tie-break: prefer Monday over Friday
         day_cost = [self.vars[c]['day'] for c in course_ids]
-        
-        # Weight: days dominate, then earlier days, then earlier slots
-        self.model.Minimize(100 * sum(day_used) + 10 * sum(day_cost) + sum(start_cost))
 
-    def _add_room_requirement_constraints(self):
-        """Course requiring specific room type gets compatible room"""
-        # Already handled by filtering compatible rooms in _create_variables
-        pass
+        # Weight: scheduled count dominates, then days, earlier days, slots
+        self.model.Maximize(
+            1_000_000 * sum(sched_vars)
+            - 100 * sum(day_used) - 10 * sum(day_cost) - sum(start_cost))
 
-    def _extract_solution(self, solver: cp_model.CpSolver) -> List[Dict]:
-        """Extract schedule from solved model"""
+    def _extract_solution(self, solver: cp_model.CpSolver,
+                          scheduled_ids: List[str]) -> List[Dict]:
+        """Extract schedule from solved model (scheduled courses only)"""
         schedule = []
-        
+
         for course in self.data.courses:
+            if course.id not in scheduled_ids:
+                continue
             course_id = course.id
-            
+
             day_idx = solver.Value(self.vars[course_id]['day'])
             block_idx = solver.Value(self.vars[course_id]['block_idx'])
             room_idx = solver.Value(self.vars[course_id]['room'])
-            
+
             day = DAYS[day_idx]
             block = self.vars[course_id]['blocks'][block_idx]
             room = self.vars[course_id]['rooms'][room_idx]
-            
+
             lecturer_ids = self.data.get_course_lecturers(course_id)
             lecturer_name = " / ".join(
                 self.data.lecturer_dict[l].name for l in lecturer_ids
             ) if lecturer_ids else "Unknown"
-            
+
             student_groups = self.data.get_course_student_groups(course_id)
-            
+
             # Get time strings
             start_slot = self.data.time_slots[block[0] - 1]
             end_slot = self.data.time_slots[block[-1] - 1]
-            
+
             schedule.append({
                 'course_id': course_id,
                 'course_code': course.code,
@@ -442,5 +571,5 @@ class CourseScheduler:
                 'end_slot': block[-1],
                 'time': f"{start_slot.start}-{end_slot.end}"
             })
-        
+
         return schedule

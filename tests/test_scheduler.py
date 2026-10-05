@@ -378,11 +378,12 @@ class TestTeamTeaching(unittest.TestCase):
 
 
 class TestInfeasibleScenario(unittest.TestCase):
-    """3.4: deliberately impossible dataset -> INFEASIBLE, not a crash."""
+    """3.4: deliberately impossible dataset -> keep building a schedule,
+    skip what cannot fit, never crash (partial scheduling)."""
 
     def test_overloaded_lecturer_single_room_is_infeasible(self):
         # 10 courses x 4 SKS = 40 slots needed,
-        # capacity = 1 room x (Mon-Fri, slots 1-4 -> one valid block/day) = 5
+        # capacity = 1 room x (Mon-Fri, slots 1-4 -> one valid block/day) = 20
         courses = [course(f"C{i:02d}", credits=4) for i in range(10)]
         enrollments = [{"course_id": c["id"], "student_groups": ["IF-3"]}
                        for c in courses]
@@ -402,8 +403,15 @@ class TestInfeasibleScenario(unittest.TestCase):
                     "type": "CLASSROOM", "capacity": 40}],
         )
         result = run_scheduler(data)
-        self.assertEqual(result.status, "INFEASIBLE",
-                         "Expected no feasible schedule for this scenario")
+        self.assertIn(result.status, ("PARTIAL", "INFEASIBLE"),
+                      "Expected a partial schedule or infeasible, not a crash")
+        if result.status == "PARTIAL":
+            self.assertTrue(result.schedule, "Partial schedule must be shown")
+            self.assertTrue(result.dropped,
+                            "Skipped courses must be reported")
+            self.assertTrue(
+                all(e["reason"] for e in result.dropped),
+                "Every skipped course needs a diagnosis reason")
 
 
 if __name__ == "__main__":
