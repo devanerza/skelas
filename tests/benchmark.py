@@ -117,7 +117,7 @@ def run_bench(n_courses, n_lecturers, n_rooms):
     with redirect_stdout(out):
         result = CourseScheduler(data).schedule()
 
-    m = re.search(r"Total constraints: (\d+)", out.getvalue())
+    m = re.search(r"Total batasan: (\d+)", out.getvalue())
     n_constraints = int(m.group(1)) if m else 0
 
     valid = "-"
