@@ -206,7 +206,8 @@ valid, exit 1 invalid.
 
 ## Roadmap
 
-- **Phase 4**: migrate JSON → PostgreSQL, FastAPI endpoints, DB integration
+- **Phase 4**: SQLite data layer + FastAPI endpoints (done — see
+  `uvicorn main:app`)
 - **Phase 5**: dashboard CRUD + trigger scheduler + schedule visualization
 - Next soft constraints: lecturer preferences, even distribution, gaps
   between classes

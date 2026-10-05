@@ -34,8 +34,9 @@ Pipeline: **load JSON → build dataclass models + lookup maps → build CP-SAT
 model → solve (30s cap) → extract result → export schedule.json → independent
 validation**.
 
-Phases 4 (PostgreSQL/FastAPI) and 5 (dashboard) from [TASKS.md](TASKS.md) are
-not implemented; `main.py` is a hello-world stub.
+Phase 4 (SQLite/FastAPI) from [TASKS.md](TASKS.md) is implemented —
+`main.py` exposes the FastAPI app over `skelas.db`. Phase 5 (dashboard)
+remains future work.
 
 ---
 
@@ -218,9 +219,10 @@ Status contract:
 - `INFEASIBLE` — 0 scheduled (diagnosis printed)
 - `UNKNOWN` — no solution within 30s cap
 
-### 3.5 Future relational mapping (Phase 4, not implemented)
+### 3.5 Relational mapping (Phase 4, implemented — SQLite)
 
-JSON files map 1:1 onto tables if/when PostgreSQL lands:
+JSON files map 1:1 onto tables in `src/db.py` (`skelas.db`, stdlib
+`sqlite3`, no extra dependency):
 
 | JSON file | Table | Keys |
 |---|---|---|
@@ -229,13 +231,14 @@ JSON files map 1:1 onto tables if/when PostgreSQL lands:
 | `lecturers.json` | `lecturers` | PK `id` |
 | `rooms.json` | `rooms` | PK `id` |
 | `time_slots.json` | `time_slots` | PK `slot` |
-| `course_enrollments.json` | `course_enrollments` | composite PK `(course_id, group_id)` — split array to rows |
+| `course_enrollments.json` | `course_enrollments` | composite PK `(course_id, group_id)` — split array to rows; `group_id NULL` marks a course with an empty array |
 | `teaching_assignments.json` | `teaching_assignments` | composite PK `(course_id, lecturer_id)` — split `lecturer_ids`; keep `needs_review` |
-| `lecturer_availability.json` | `lecturer_availability` | composite PK `(lecturer_id, day, slot)` — JSONB `availability` also possible |
-| `schedule.json` | `schedules` + `schedule_entries` | entries FK → `courses`, `rooms`; arrays → join rows |
+| `lecturer_availability.json` | `lecturer_availability` | composite PK `(lecturer_id, day, slot)` — split the availability dict |
+| `schedule.json` | `schedules` + `schedule_entries` + `schedule_dropped` | entries FK → `courses`; arrays stored as JSON text |
 
-The engine reads through `SchedulerData` only, so swapping `_load_json()` for
-SQL queries leaves `CourseScheduler` untouched.
+Seeding (`seed_from_json`) runs `DataValidator` first, wipes + inserts in one
+transaction, then sanity-checks row counts. `SchedulerData(conn=...)` reads
+the same lookup maps as the JSON path, so `CourseScheduler` is untouched.
 
 ---
 

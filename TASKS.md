@@ -516,14 +516,13 @@ Notes:
 
 ---
 
-## Phase 4 — Database & API (Future)
+## Phase 4 — Database & API (Complete)
 
-**Not started yet.** To be done after Phase 1-3 are stable.
-
-Detailed schema mapping lives in [ARCHITECTURE.md §3.5](ARCHITECTURE.md) —
-this phase follows it. Key invariant: `CourseScheduler` reads only through
-`SchedulerData`, so swapping `_load_json()` for SQL leaves the engine
-untouched.
+**Done.** SQLite (stdlib `sqlite3`, no extra dependency) instead of
+PostgreSQL; schema mirrors `data/*.json` per [ARCHITECTURE.md §3.5](ARCHITECTURE.md).
+Key invariant held: `CourseScheduler` reads only through `SchedulerData`,
+so the loader swap left the engine untouched — all 15 engine tests pass
+against BOTH backends (JSON + SQL, gated by `tests/test_db.py`).
 
 Goals:
 - Migrate JSON data → PostgreSQL
@@ -627,8 +626,9 @@ Goals:
 
 ## Current Status
 
-**Phase**: Phase 1-3 complete (data modeling, CP-SAT engine, testing).
-**Next**: Phase 4 — database & API
+**Phase**: Phase 1-4 complete (data modeling, CP-SAT engine, testing,
+database & API).
+**Next**: Phase 5 — dashboard/UI
 
 ---
 
