@@ -541,23 +541,34 @@ Example:
 
 No feasible schedule exists.
 
-The system should return a meaningful infeasible result rather than simply:
+**Implemented behavior — partial scheduling**: instead of returning nothing,
+the system ALWAYS produces and shows a schedule by skipping the specific
+infeasible courses. Every course has a reified `sched` boolean; the objective
+maximizes `sum(sched)` first, so the solver itself selects the smallest set
+of courses to skip:
 
-    "Generate failed."
+- all courses scheduled → status `FEASIBLE`
+- some scheduled → status `PARTIAL` — schedule is shown, then a skipped
+  section listing each dropped course with a concrete reason (which
+  lecturer/group/room is saturated, or missing room type / too-tight
+  availability), naming lecturers and courses by NAME
+- none scheduled → status `INFEASIBLE` with a diagnosis
 
-Ideally, the system should eventually identify the relevant conflicting constraints.
-
-Potential future feature:
-
-    Conflict explanation / constraint diagnosis
+Per-course diagnosis is computed statically from the data: valid
+(day, block) options vs. occupied slots of the scheduled entries, room-type
+availability, lecturer free-slot load. Full-model diagnosis (`diagnose()`)
+covers lecturer load vs availability (with a solver probe), student-group
+load vs weekly slots, and room capacity vs demand — each finding names the
+offending entity and the data file to edit.
 
 Example:
 
-    No feasible schedule found.
+    Jadwal parsial: 54 dari 58 mata kuliah terjadwal, 4 dilewati
 
-    Possible bottleneck:
-    Lecturer A has only 6 available slots,
-    but assigned courses require 8 slots.
+    DILEWATI (tidak feasible):
+      Penjaminan Mutu Perangkat Lunak
+        Alasan: Dosen X sudah penuh di semua slot tersedia oleh mata
+        kuliah yang terjadwal
 
 ---
 
@@ -672,6 +683,14 @@ Example:
 
     Time:
         08:15–10:30
+
+Top-level result:
+
+    status:  FEASIBLE | PARTIAL | INFEASIBLE | UNKNOWN
+    solve_time
+    schedule: [entry ...]
+    dropped:  [ {course_id, course_code, course_name, reason} ... ]
+             (only non-empty for PARTIAL — the skipped courses)
 
 ---
 

@@ -1,6 +1,6 @@
 # Development Tasks — Academic Course Scheduling System
 
-Berdasarkan PRD dan development plan, berikut task execution untuk membangun scheduler engine.
+Based on the PRD and development plan, here is the task execution for building the scheduler engine.
 
 ---
 
@@ -37,7 +37,7 @@ Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
 
 ## Phase 1 — Data Modeling & Input Validation
 
-**Goal**: Buat data jadwal dalam JSON/Python object, bukan database. Validasi struktur data sebelum masuk scheduler.
+**Goal**: Store scheduling data as JSON/Python objects, not a database. Validate data structure before it reaches the scheduler.
 
 ### 1.1 Setup Project Structure
 
@@ -84,7 +84,7 @@ scheduler/
 ]
 ```
 
-**Important**: Slot 1-9 satu rentang konsekutif; tidak ada jeda istirahat yang dipaksakan (kelas/dosen atur break sendiri).
+**Important**: Slots 1-9 are one consecutive range; no forced lunch break (classes/lecturers arrange their own break).
 
 ### 1.3 Define Courses (data/courses.json)
 
@@ -109,7 +109,7 @@ scheduler/
 ]
 ```
 
-**Rule**: `curriculum_semester` adalah metadata akademik, bukan penentu konflik.
+**Rule**: `curriculum_semester` is academic metadata, not a conflict determinant.
 
 ### 1.4 Define Student Groups (data/student_groups.json)
 
@@ -133,7 +133,7 @@ scheduler/
 ]
 ```
 
-**Critical**: Ini yang menentukan student conflict, bukan `curriculum_semester`.
+**Critical**: This is what determines student conflict, not `curriculum_semester`.
 
 ### 1.6 Define Lecturers (data/lecturers.json)
 
@@ -182,7 +182,7 @@ scheduler/
 
 ### 1.10 Build Data Models (src/models/)
 
-Buat Python dataclass/pydantic models untuk setiap entity:
+Build Python dataclass/pydantic models for each entity:
 - `Course`
 - `StudentGroup`
 - `Lecturer`
@@ -250,7 +250,7 @@ Example for 4 SKS:
 [
   [1,2,3,4],  # valid
   [2,3,4,5],  # valid
-  [3,4,5,6],  # valid (slot 5→6 tidak dianggap jeda)
+  [3,4,5,6],  # valid (slot 5→6 is not treated as a break)
   [4,5,6,7],  # valid
   [5,6,7,8],  # valid
   [6,7,8,9]   # valid
@@ -263,6 +263,7 @@ For each course, scheduler determines:
 - `day` (MONDAY - SATURDAY)
 - `start_slot` (from valid consecutive blocks)
 - `room` (from available rooms matching room_type_required)
+- `sched` (reified bool: course is scheduled at all — see 2.8)
 
 ### 2.4 Implement Hard Constraints
 
@@ -315,86 +316,106 @@ Output:
 }
 ```
 
-If infeasible:
+If nothing can be scheduled:
 ```json
 {
   "status": "INFEASIBLE",
-  "message": "No valid schedule found"
+  "message": "No course can be scheduled under current constraints"
 }
 ```
 
-### 2.6 Create scheduler.py CLI
+### 2.6 Create run_scheduler.py CLI
 
 ```bash
-python scheduler.py
+python run_scheduler.py
 ```
 
-Output:
+Output (console messages in Bahasa Indonesia, status values in English):
 ```
-Loading data...
-Courses: 50
-Student groups: 15
-Lecturers: 10
-Rooms: 8
+Memuat data...
+Mata kuliah: 50
+Kelompok mahasiswa: 15
+Dosen: 10
+Ruangan: 8
 
-Building constraints...
-Solving...
+Membuat variabel keputusan...
+Menambahkan batasan...
+Memecahkan (berbatas waktu, solusi terbaik tetap ditampilkan)...
 
 Status: FEASIBLE
-Solve time: 2.31 seconds
+Waktu penyelesaian: 2.31 detik
 ```
+
+### 2.7 (Done) Add independent schedule validator
+
+`validate_schedule.py` re-runs all hard constraints on `schedule.json` without trusting the solver.
+
+### 2.8 Partial Scheduling — always return a schedule
+
+Every course gets a reified `sched` bool; all of its constraints are guarded
+by it and the objective maximizes `1_000_000 * sum(sched)` first, so CP-SAT
+picks which courses to skip in ONE solve (the old single-drop probe loop
+never isolated multi-course conflicts → status UNKNOWN).
+
+Status contract:
+- 0 scheduled → `INFEASIBLE`
+- all scheduled → `FEASIBLE`
+- some scheduled → `PARTIAL` + `dropped` list with a per-course reason
+
+Solve is capped at 30s with a live progress callback so long runs never look
+hung; the best solution found is always returned.
 
 ---
 
 ## Phase 3 — Testing & Validation
 
-**Goal**: Test scheduler correctness dengan unit test, integration test, dan schedule validator.
+**Goal**: Test scheduler correctness with unit tests, integration tests, and the schedule validator.
 
 ### 3.1 Unit Tests for Constraints
 
 #### Test 1: Lecturer Conflict
 ```python
 # 2 courses, 1 lecturer
-# Expected: courses tidak overlap
+# Expected: courses do not overlap
 ```
 
 #### Test 2: Room Conflict
 ```python
 # 2 courses, 1 room
-# Expected: courses tidak overlap
+# Expected: courses do not overlap
 ```
 
 #### Test 3: Student Group Conflict
 ```python
 # MK001 → IF-3
 # MK002 → IF-3
-# Expected: tidak overlap
+# Expected: no overlap
 ```
 
 #### Test 4: Different Student Groups
 ```python
 # MK001 → IF-3
 # MK002 → BD-3
-# Expected: BOLEH overlap
+# Expected: overlap ALLOWED
 ```
 
 #### Test 5: Cross-Semester Conflict
 ```python
 # MK001 → IF-3, IF-5
 # MK002 → IF-5
-# Expected: tidak overlap (karena sama-sama attended by IF-5)
+# Expected: no overlap (both attended by IF-5)
 ```
 
 #### Test 6: Consecutive Slots for 4 SKS
 ```python
-# Valid: [1,2,3,4] .. [6,7,8,9] (semua rentang konsekutif 1-9)
+# Valid: [1,2,3,4] .. [6,7,8,9] (all consecutive ranges within 1-9)
 ```
 
 #### Test 7: Lecturer Availability
 ```python
 # Lecturer A available Wednesday only
 # Course assigned to Lecturer A
-# Expected: harus scheduled on Wednesday
+# Expected: scheduled on Wednesday
 ```
 
 #### Test 8: Room Type Requirement
@@ -403,9 +424,16 @@ Solve time: 2.31 seconds
 # Expected: assigned to LAB01 (type=COMPUTER_LAB), not R501 (CLASSROOM)
 ```
 
+#### Test 9: Infeasible Scenario → partial schedule
+```python
+# 10 courses × 4 SKS, 1 room, 1 lecturer
+# Expected: PARTIAL or INFEASIBLE with a shown schedule and a reason
+# for every skipped course (never a crash / UNKNOWN)
+```
+
 ### 3.2 Build Independent Schedule Validator (validate_schedule.py)
 
-Setelah scheduler generate jadwal, validasi ulang secara independen:
+After the scheduler generates a schedule, validate it independently:
 
 ```bash
 python validate_schedule.py schedule.json
@@ -426,21 +454,21 @@ Schedule is VALID.
 
 ### 3.3 Test Real Dataset
 
-Buat dataset realistis:
-- 50 courses
-- 10 lecturers
-- 8 rooms
+Use the realistic dataset:
+- 58 courses
+- 20 lecturers
+- 5 rooms
 - 15 student groups
 - 6 days
 - 9 slots
 
-Run scheduler dan catat:
+Run the scheduler and record:
 - Solve time
-- Status (FEASIBLE/INFEASIBLE)
+- Status (FEASIBLE/PARTIAL)
 
 ### 3.4 Test Infeasible Scenario
 
-Buat skenario yang sengaja tidak mungkin:
+Build a deliberately impossible scenario:
 ```
 1 room
 1 lecturer
@@ -448,63 +476,64 @@ Buat skenario yang sengaja tidak mungkin:
 Only Monday-Friday, slot 1-4 available
 ```
 
-Expected: `INFEASIBLE`
+Expected: `PARTIAL` (some courses scheduled, rest listed with reasons) or `INFEASIBLE`.
 
 ### 3.5 Benchmark Table
 
-Hasil run nyata: `python tests/benchmark.py` (seed deterministik `SSEED = 20261003`,
-validator independen meng-**VALID**ate setiap hasil FEASIBLE).
-Solver timeout 120s. Dataset di-generate dengan load balancing
-(lecturer/group paling ringan diprioritaskan) supaya tidak ada hotspot kapasitas.
+Real run: `python tests/benchmark.py` (deterministic seed `SSEED = 20261003`,
+independent validator **validates** every FEASIBLE/PARTIAL result).
+Solver time cap 30s. Dataset generated with load balancing (lightest
+lecturer/group prioritized) so no capacity hotspot exists.
 
-Encoding: conflict di-encode sebagai `AddNoOverlap` pada interval waktu absolut
-(bukan pairwise block comparison). Lihat bagian "Constraint Encoding" di PRD.md.
+Encoding: conflicts are encoded as `AddNoOverlap` on absolute time intervals
+(not pairwise block comparison). See "Constraint Encoding" in PRD.md.
 
-| Courses | Lecturers | Rooms | Constraints | Solve Time | Status   | Valid  |
-|---------|-----------|-------|-------------|------------|----------|--------|
-| 10      | 5         | 4     | 743         | 0.18s      | FEASIBLE | VALID  |
-| 25      | 8         | 6     | 1,586       | 3.84s      | FEASIBLE | VALID  |
-| 50      | 12        | 8     | 3,513       | 120.30s    | FEASIBLE | VALID  |
-| 80      | 16        | 8     | 5,648       | 120.29s    | FEASIBLE | VALID  |
+| Courses | Lecturers | Rooms | Constraints | Solve Time | Status         | Valid |
+|---------|-----------|-------|-------------|------------|----------------|-------|
+| 10      | 5         | 4     | 743         | 0.18s      | FEASIBLE       | VALID |
+| 25      | 8         | 6     | 1,586       | 3.84s      | FEASIBLE       | VALID |
+| 50      | 12        | 8     | 3,513       | 30s cap    | FEASIBLE/PARTIAL | VALID |
+| 80      | 16        | 8     | 5,648       | 30s cap    | FEASIBLE/PARTIAL | VALID |
 
-Perbandingan sebelum refactor pairwise → `AddNoOverlap` (commit `d44e353`):
+Historical comparison before the pairwise → `AddNoOverlap` refactor (commit `d44e353`):
 
-| Courses | Constraints (pairwise) | Constraints (NoOverlap) | Status sebelum | Status sesudah |
-|---------|------------------------|-------------------------|----------------|----------------|
-| 10      | 8,248                  | 743                     | FEASIBLE       | FEASIBLE       |
-| 25      | 91,749                 | 1,586                   | FEASIBLE       | FEASIBLE       |
-| 50      | 488,612                | 3,513                   | FEASIBLE       | FEASIBLE       |
-| 80      | 1,397,302              | 5,648                   | UNKNOWN        | FEASIBLE       |
+| Courses | Constraints (pairwise) | Constraints (NoOverlap) | Status before | Status after |
+|---------|------------------------|-------------------------|---------------|--------------|
+| 10      | 8,248                  | 743                     | FEASIBLE      | FEASIBLE     |
+| 25      | 91,749                 | 1,586                   | FEASIBLE      | FEASIBLE     |
+| 50      | 488,612                | 3,513                   | FEASIBLE      | FEASIBLE     |
+| 80      | 1,397,302              | 5,648                   | UNKNOWN       | FEASIBLE     |
 
-Catatan:
-- 50 dan 80 courses mendekati batas timeout 120s (solusi ketemu, tapi optimalitas
-  belum tentu tercapai). Naikkan `max_time_in_seconds` di `src/scheduler.py`
-  bila perlu hasil optimal.
-- Sebelum refactor, 80 courses = **UNKNOWN** (timeout). Sesudahnya **FEASIBLE**.
-- Constraint tumbuh ~kuadratik terhadap jumlah courses, tapi konstanta jauh lebih
-  kecil karena solver memproses `AddNoOverlap` sebagai struktur native, bukan
-  ratusan ribu clause bool.
+Notes:
+- The benchmark rows above were captured before the 120s → 30s cap change;
+  at the 30s cap 50/80 may end `PARTIAL` (solver keeps optimizing, the best
+  solution is still returned). Raise `max_time_in_seconds` in
+  `src/scheduler.py` if more courses/optimality are needed.
+- Before the refactor, 80 courses = **UNKNOWN** (timeout). After: **FEASIBLE**.
+- Constraints grow ~quadratically with course count, but the constant is far
+  smaller because the solver processes `AddNoOverlap` as a native structure,
+  not hundreds of thousands of bool clauses.
 
 ---
 
 ## Phase 4 — Database & API (Future)
 
-**Not started yet.** Akan dilakukan setelah Phase 1-3 stabil.
+**Not started yet.** To be done after Phase 1-3 are stable.
 
 Goals:
 - Migrate JSON data → PostgreSQL
 - Build FastAPI endpoints
-- Integrate scheduler engine dengan database
+- Integrate scheduler engine with the database
 
 ---
 
 ## Phase 5 — Dashboard/UI (Future)
 
-**Not started yet.** Akan dilakukan setelah Phase 4 stabil.
+**Not started yet.** To be done after Phase 4 is stable.
 
 Goals:
 - React/Next.js dashboard
-- CRUD untuk courses, lecturers, rooms, student groups
+- CRUD for courses, lecturers, rooms, student groups
 - Trigger scheduler via UI
 - Visualize schedule output
 
@@ -512,14 +541,16 @@ Goals:
 
 ## Current Status
 
-**Phase**: Phase 1 (Setup)
-**Next**: Create project structure and define JSON data files
+**Phase**: Phase 1-3 complete (data modeling, CP-SAT engine, testing).
+**Next**: Phase 4 — database & API
 
 ---
 
 ## Notes
 
 - **DO NOT** skip Phase 1-3 and jump to database/UI
-- Scheduler engine harus berdiri sendiri dan testable tanpa database
-- Fokus: correctness first, optimization later
-- Soft constraints belum diimplementasikan (future work)
+- Scheduler engine must stand alone and be testable without a database
+- Focus: correctness first, optimization later
+- Soft constraints not implemented yet (future work)
+- Console output is Bahasa Indonesia; status values (`FEASIBLE`/`PARTIAL`/
+  `INFEASIBLE`) stay English because code and tests depend on them
