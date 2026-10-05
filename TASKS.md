@@ -520,10 +520,96 @@ Notes:
 
 **Not started yet.** To be done after Phase 1-3 are stable.
 
+Detailed schema mapping lives in [ARCHITECTURE.md §3.5](ARCHITECTURE.md) —
+this phase follows it. Key invariant: `CourseScheduler` reads only through
+`SchedulerData`, so swapping `_load_json()` for SQL leaves the engine
+untouched.
+
 Goals:
 - Migrate JSON data → PostgreSQL
 - Build FastAPI endpoints
 - Integrate scheduler engine with the database
+
+### 4.1 Schema Migration (JSON → PostgreSQL)
+
+Create tables mirroring the JSON files (PKs/FKs per ARCHITECTURE.md §3.2):
+
+```sql
+courses            (id PK, code, name, curriculum_semester, credits CHECK 2-4, room_type_required)
+student_groups     (id PK, program, cohort, semester)
+lecturers          (id PK, name)
+rooms              (id PK, name UNIQUE, type, capacity)
+time_slots         (slot PK CHECK 1-9, start, end)
+course_enrollments (course_id FK→courses, group_id FK→student_groups,
+                    PK (course_id, group_id))          -- split student_groups[] to rows
+teaching_assignments (course_id FK→courses, lecturer_id FK→lecturers,
+                    needs_review, PK (course_id, lecturer_id)) -- split lecturer_id/lecturer_ids[]
+lecturer_availability (lecturer_id FK→lecturers, day, slot, PK (lecturer_id, day, slot))
+-- alternative: single row per lecturer with JSONB availability column
+```
+
+- `room_type_required` stays a soft link (enum/CHECK against
+  `rooms.type`), not FK — matches current data model.
+- Migrate script: read each `data/*.json`, split array columns
+  (`student_groups`, `lecturer_ids`) into join rows, insert.
+- Sanity check: row counts after split == sum of array lengths before.
+
+### 4.2 Data Access Layer — swap loader behind `SchedulerData`
+
+- Refactor `SchedulerData.__init__` to accept a source
+  (`data_dir` JSON vs `db_session` SQL); all `_load_*` methods return the
+  same dataclass lists.
+- Rebuild the same lookup maps (`course_dict`, `course_to_groups`,
+  `course_to_lecturer`, `lecturer_to_availability`) from query results —
+  engine and validators must be byte-identical in behavior.
+- Keep `data/` JSON as fallback + seed source for tests.
+- Gate: `python tests/test_scheduler.py` passes against BOTH backends.
+
+### 4.3 FastAPI Endpoints
+
+Extend [main.py](main.py) (currently a stub):
+
+```
+GET    /courses, /lecturers, /rooms, /student-groups        # list
+POST   /courses ... (CRUD per entity)
+POST   /schedule/run            # run CourseScheduler, persist result
+GET    /schedule/latest         # status + schedule[] + dropped[]
+POST   /schedule/validate       # run ScheduleValidator on latest run
+GET    /diagnose                # CourseScheduler.diagnose() findings
+```
+
+- `POST /schedule/run` wraps `run_scheduler.py` logic: load → solve
+  (30s cap, run in background task if slow) → return `ScheduleResult`
+  envelope (`status`, `solve_time`, `schedule`, `dropped`).
+- Status contract unchanged: `FEASIBLE` / `PARTIAL` / `INFEASIBLE` /
+  `UNKNOWN` (code and tests depend on these values).
+
+### 4.4 Persist Schedule Output
+
+- `schedules` table (id, status, solve_time, message, created_at) +
+  `schedule_entries` (schedule_id FK, course_id FK, room_id FK, day,
+  start_slot, end_slot, lecturer text, ...) — replaces the `schedule.json`
+  file drop for API consumers; keep file export as dev convenience.
+- `dropped` reasons stored alongside (course_id, reason) so `/schedule/latest`
+  explains partial runs without re-solving.
+
+### 4.5 Validation Integration
+
+- Input: run `DataValidator` before every migration insert and behind
+  `POST /courses` etc. (reject invalid rows with its `errors` list).
+- Output: expose `ScheduleValidator` checks via `POST /schedule/validate`
+  so the API never trusts the solver — same rule as the CLI.
+
+---
+
+**Commit points** (per Git Commit Rule above):
+- `feat: add PostgreSQL schema mirroring data/ JSON files`
+- `feat: add JSON-to-PostgreSQL migration script`
+- `feat: add db-backed source to SchedulerData with JSON fallback`
+- `feat: add FastAPI CRUD endpoints for scheduling entities`
+- `feat: add /schedule/run endpoint integrating CP-SAT engine`
+- `feat: persist schedule results and dropped reasons to database`
+- `feat: expose input and schedule validation via API`
 
 ---
 
