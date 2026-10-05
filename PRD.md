@@ -17,6 +17,10 @@ while satisfying hard constraints and, later, potentially optimizing soft constr
 
 The project is intended to solve a real university scheduling problem, not merely generate random timetable data.
 
+**Scope**: backend/API only. This repository delivers the scheduling engine
+plus a REST API. The test GUI/dashboard is developed separately in a
+duplicate repository and consumes this API — no UI code lives here.
+
 ---
 
 # 2. Academic Context
@@ -730,9 +734,10 @@ Phase 3:
 - constraint relaxation
 - import/export
 - API
-- dashboard/UI
 
-The scheduler engine should remain independent from the UI.
+Phase 4 (database + API) is implemented. The dashboard/UI is OUT OF SCOPE
+for this repository — it is built in a separate duplicate repo against this
+API. The scheduler engine remains independent from any UI.
 
 ---
 

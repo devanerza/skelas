@@ -35,8 +35,9 @@ model → solve (30s cap) → extract result → export schedule.json → indepe
 validation**.
 
 Phase 4 (SQLite/FastAPI) from [TASKS.md](TASKS.md) is implemented —
-`main.py` exposes the FastAPI app over `skelas.db`. Phase 5 (dashboard)
-remains future work.
+`main.py` exposes the FastAPI app over `skelas.db`. This repo is API-only;
+the dashboard is a separate duplicate repo consuming this API, so no UI
+layer exists in this architecture.
 
 ---
 

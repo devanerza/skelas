@@ -612,31 +612,30 @@ GET    /diagnose                # CourseScheduler.diagnose() findings
 
 ---
 
-## Phase 5 — Dashboard/UI (Future)
+## Phase 5 — Dashboard/UI (Out of Scope — Separate Repo)
 
-**Not started yet.** To be done after Phase 4 is stable.
-
-Goals:
-- React/Next.js dashboard
-- CRUD for courses, lecturers, rooms, student groups
-- Trigger scheduler via UI
-- Visualize schedule output
+**Not part of this repository.** The dashboard/test GUI is developed in a
+separate duplicate repo consuming this project's REST API. Only API-side
+work happens here. Do not add frontend code to this repo.
 
 ---
 
 ## Current Status
 
 **Phase**: Phase 1-4 complete (data modeling, CP-SAT engine, testing,
-database & API).
-**Next**: Phase 5 — dashboard/UI
+database & API). Project scope is API-only.
+**Next**: Dashboard/UI lives in a separate duplicate repo — API-side work
+continues here (soft constraints, relaxation, endpoint coverage).
 
 ---
 
 ## Notes
 
-- **DO NOT** skip Phase 1-3 and jump to database/UI
+- **DO NOT** skip Phase 1-3 and jump to database work
 - Scheduler engine must stand alone and be testable without a database
 - Focus: correctness first, optimization later
 - Soft constraints not implemented yet (future work)
+- **API-only repo**: no dashboard/GUI code here — built in a separate
+  duplicate repo against this API
 - Console output is Bahasa Indonesia; status values (`FEASIBLE`/`PARTIAL`/
   `INFEASIBLE`) stay English because code and tests depend on them

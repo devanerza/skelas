@@ -14,8 +14,11 @@ Full details in [PRD.md](PRD.md), execution plan in [TASKS.md](TASKS.md).
 | 1 | Data modeling & input validation | Done |
 | 2 | Scheduling engine (CP-SAT) | Done |
 | 3 | Testing & validation | Done |
-| 4 | Database & API | Not started |
-| 5 | Dashboard/UI | Not started |
+| 4 | Database & API | Done |
+
+API-only project: this repo exposes the scheduling engine over REST; the
+test GUI/dashboard is built in a separate duplicate repository against this
+API.
 
 ---
 
@@ -208,7 +211,7 @@ valid, exit 1 invalid.
 
 - **Phase 4**: SQLite data layer + FastAPI endpoints (done — see
   `uvicorn main:app`)
-- **Phase 5**: dashboard CRUD + trigger scheduler + schedule visualization
+- Dashboard/UI: out of scope — separate duplicate repo consuming this API
 - Next soft constraints: lecturer preferences, even distribution, gaps
   between classes
 - Tiered constraint relaxation (PRD §17)
