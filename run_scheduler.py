@@ -98,25 +98,20 @@ def main():
             print("\n" + "=" * 60)
             print(f"DILEWATI (tidak feasible): {len(result.dropped)} mata kuliah")
             print("=" * 60)
-            for entry in result.dropped:
-                meta = (f"{entry.get('credits', 0)} SKS · "
-                        f"{entry.get('room_type_required', '')} · "
-                        f"Ruang: {', '.join(entry.get('rooms', []))} · "
-                        f"Dosen: {', '.join(entry.get('lecturers', []))} · "
-                        f"Kelompok: {', '.join(entry.get('student_groups', []))}")
-                print(f"  ✗ {entry['course_code']} - {entry['course_name']}")
-                print(f"    {meta}")
-                print(f"    Alasan: {entry['reason']}")
-                if entry.get('suggestion'):
-                    print(f"    Saran: {entry['suggestion']}")
-                print()
-            print("Diagnosis per mata kuliah (perbaiki file data, lalu jalankan ulang):")
-            for i, e in enumerate(scheduler.diagnose_dropped(result.dropped), 1):
-                print(f"{i}. {e['course_name']}: {e['reason']}")
+            for e in result.dropped:
+                meta = (f"{e['course_name']} — {e['course_code']} · "
+                        f"{e['credits']} SKS · {e['room_type_required']}")
+                print(f"  ✗ {meta}")
+                if e.get('rooms'):
+                    print(f"    Ruang: {', '.join(e['rooms'])}")
+                if e.get('lecturers'):
+                    print(f"    Dosen: {', '.join(e['lecturers'])}")
+                if e.get('student_groups'):
+                    print(f"    Kelompok: {', '.join(e['student_groups'])}")
+                print(f"    Alasan: {e['reason']}")
                 if e.get('suggestion'):
-                    print(f"   Saran: {e['suggestion']}")
-            print()
-        
+                    print(f"    Saran: {e['suggestion']}")
+                print()
         return 0
     
     elif result.status == "INFEASIBLE":

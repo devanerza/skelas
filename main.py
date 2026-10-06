@@ -99,7 +99,8 @@ def validate_latest(conn=Depends(get_conn)):
     latest = db.load_latest(conn)
     if latest is None:
         raise HTTPException(404, "Belum ada jadwal tersimpan — jalankan POST /schedule/run")
-    validator = ScheduleValidator(SchedulerData(conn=conn), latest["schedule"])
+    validator = ScheduleValidator(SchedulerData(conn=conn), latest["schedule"],
+                                  latest["dropped"])
     ok = _silent(validator.validate)
     return {"run_id": latest["id"], "valid": ok, "errors": validator.errors}
 

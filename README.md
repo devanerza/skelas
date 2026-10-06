@@ -91,12 +91,37 @@ itself decides which courses must be skipped when everything cannot fit:
 - **0 scheduled** → `INFEASIBLE`
 - **all scheduled** → `FEASIBLE`
 - **some scheduled** → `PARTIAL` — the schedule is printed, then a
-  `DILEWATI` section lists each skipped course with a concrete reason
-  (which lecturer/group/room is saturated), plus a per-course diagnosis.
+  `DILEWATI` section lists each skipped course as a diagnosis card:
+  metadata line (`MK-407 · 3 SKS · LAB · Ruang: ... · Dosen: ...`),
+  a concrete `Alasan:` aggregating every blocker (lecturer/group/room —
+  not just the first), and a `Saran:` naming the smallest set of courses
+  to move to free a slot.
 
 Solve is capped at 30s with a live progress callback (each improving
 solution prints), so long runs never look hung. The best solution found is
 always returned.
+
+### Diagnosis cards
+
+Every dropped course carries everything the UI needs without joins:
+`course_id`, `course_code`, `course_name`, `credits`, `room_type_required`,
+`rooms[]`, `lecturers[]`, `student_groups[]`, `reason`, `suggestion`.
+
+- **`reason`** — structural checks first (no compatible room, no valid
+  day/block from lecturer availability), then all remaining blockers
+  collected: co-lecturer fully booked, group fully booked, no room free,
+  or "each resource free somewhere, never together" (with option count).
+- **`suggestion`** — counterfactual probe over the extracted schedule:
+  for every valid (day, block), find scheduled courses that overlap it
+  AND share a resource; if evicting them frees the slot, report the
+  smallest such set (`bebaskan X, Y, Z dari Senin slot 7–9`). Falls back
+  to generic advice naming the JSON file to edit. Pure Python — no extra
+  solver call.
+- **Full-model `diagnose()`** — separate path, only when INFEASIBLE/UNKNOWN
+  and no partial schedule exists; returns entity-level findings.
+
+API: `GET /diagnose` → `{run_id, status, items}` where `items` is the
+card list (PARTIAL) or `[{finding}]` (INFEASIBLE/UNKNOWN).
 
 ### Timeline encoding
 

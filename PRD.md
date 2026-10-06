@@ -553,14 +553,21 @@ of courses to skip:
 
 - all courses scheduled → status `FEASIBLE`
 - some scheduled → status `PARTIAL` — schedule is shown, then a skipped
-  section listing each dropped course with a concrete reason (which
-  lecturer/group/room is saturated, or missing room type / too-tight
-  availability), naming lecturers and courses by NAME
+  section listing each dropped course as a **diagnosis card**: metadata
+  line (code · SKS · room type · rooms · lecturers · groups), a concrete
+  `Alasan:` (which lecturer/group/room is saturated, or missing room type /
+  too-tight availability — ALL blockers aggregated, not just the first),
+  and a `Saran:` fix
 - none scheduled → status `INFEASIBLE` with a diagnosis
 
 Per-course diagnosis is computed statically from the data: valid
 (day, block) options vs. occupied slots of the scheduled entries, room-type
-availability, lecturer free-slot load. Full-model diagnosis (`diagnose()`)
+availability, lecturer free-slot load. The `Saran:` suggestion is a
+counterfactual probe — for every valid (day, block) it finds the smallest
+set of scheduled courses sharing a resource (lecturer/group/room) whose
+eviction frees the slot (`bebaskan X, Y, Z dari Senin slot 7–9`), falling
+back to generic advice naming the JSON file to edit. Full-model diagnosis
+(`diagnose()`), used only when no schedule exists (INFEASIBLE/UNKNOWN),
 covers lecturer load vs availability (with a solver probe), student-group
 load vs weekly slots, and room capacity vs demand — each finding names the
 offending entity and the data file to edit.
@@ -570,9 +577,12 @@ Example:
     Jadwal parsial: 54 dari 58 mata kuliah terjadwal, 4 dilewati
 
     DILEWATI (tidak feasible):
-      Penjaminan Mutu Perangkat Lunak
-        Alasan: Dosen X sudah penuh di semua slot tersedia oleh mata
-        kuliah yang terjadwal
+      Penjaminan Mutu Perangkat Lunak — PMPL-404 · 3 SKS · COMPUTER_LAB
+        Ruang: Lab Komputer · Dosen: Dini Saputri · Kelompok: IF-4, BD-4
+        Alasan: Blokir: Dosen X sudah penuh di semua slot valid;
+                Lab Komputer terpakai di semua opsi.
+        Saran: bebankan X, Y, Z dari Senin slot 7–9 (atau pindahkan
+               satu dari mereka ke hari lain)
 
 ---
 
@@ -693,8 +703,15 @@ Top-level result:
     status:  FEASIBLE | PARTIAL | INFEASIBLE | UNKNOWN
     solve_time
     schedule: [entry ...]
-    dropped:  [ {course_id, course_code, course_name, reason} ... ]
-             (only non-empty for PARTIAL — the skipped courses)
+    dropped:  [ {course_id, course_code, course_name, credits,
+                 room_type_required, rooms[], lecturers[], student_groups[],
+                 reason, suggestion} ... ]
+             (only non-empty for PARTIAL — the skipped courses; each entry
+              is a self-contained diagnosis card, no UI joins needed)
+
+`GET /diagnose` returns the same cards as `items: List[dict]` for the
+latest run, or `[{finding}]` from the full-model diagnosis when the run
+is INFEASIBLE/UNKNOWN.
 
 ---
 

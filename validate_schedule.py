@@ -26,9 +26,10 @@ def entry_slots(entry) -> list:
 
 
 class ScheduleValidator:
-    def __init__(self, data: SchedulerData, schedule: list):
+    def __init__(self, data: SchedulerData, schedule: list, dropped: list | None = None):
         self.data = data
         self.schedule = schedule
+        self.dropped_ids = {d["course_id"] for d in (dropped or [])}
         self.errors: list[str] = []
 
     def fail(self, check: str, msg: str):
@@ -152,14 +153,15 @@ class ScheduleValidator:
         return ok
 
     def check_all_courses_scheduled(self) -> bool:
-        """Every course appears exactly once, with a valid day."""
+        """Every course appears exactly once (except declared drops), valid day."""
         ok = True
         seen = [e["course_id"] for e in self.schedule]
         for course in self.data.courses:
             count = seen.count(course.id)
             if count == 0:
-                self.fail("coverage", f"{course.code} not scheduled")
-                ok = False
+                if course.id not in self.dropped_ids:
+                    self.fail("coverage", f"{course.code} not scheduled")
+                    ok = False
             elif count > 1:
                 self.fail("coverage", f"{course.code} scheduled {count} times")
                 ok = False

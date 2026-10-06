@@ -10,6 +10,8 @@ from .utils import generate_consecutive_blocks, slots_overlap
 
 
 DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
+DAY_ID = {"MONDAY": "Senin", "TUESDAY": "Selasa", "WEDNESDAY": "Rabu",
+          "THURSDAY": "Kamis", "FRIDAY": "Jumat", "SATURDAY": "Sabtu"}
 
 
 class ScheduleResult:
@@ -99,25 +101,8 @@ class CourseScheduler:
                 message="Tidak ada mata kuliah yang bisa dijadwalkan dengan batasan saat ini")
 
         schedule = self._extract_solution(solver, scheduled_ids)
-        dropped = []
-        for course_id in dropped_ids:
-            course = self.data.course_dict[course_id]
-            reason, suggestion = self._drop_reason(course_id, schedule)
-            lecturers = self.data.get_course_lecturers(course_id)
-            dropped.append({
-                'course_id': course_id,
-                'course_code': course.code,
-                'course_name': course.name,
-                'credits': course.credits,
-                'room_type_required': course.room_type_required,
-                'rooms': [r.name for r in
-                          self.data.get_compatible_rooms(course.room_type_required)],
-                'lecturers': [self.data.lecturer_dict[l].name for l in lecturers
-                              if l in self.data.lecturer_dict],
-                'student_groups': self.data.get_course_student_groups(course_id),
-                'reason': reason,
-                'suggestion': suggestion,
-            })
+        dropped = [self._drop_reason(course_id, schedule)
+                   for course_id in dropped_ids]
 
         if dropped:
             message = (f"Jadwal parsial: {len(schedule)} dari "
@@ -140,28 +125,36 @@ class CourseScheduler:
                           list(range(e['start_slot'], e['end_slot'] + 1)))
             for e in occupied)
 
-    def _drop_reason(self, course_id: str,
-                     scheduled: List[Dict]) -> tuple:
-        """Why this course could not be placed alongside the produced schedule.
+    def _drop_reason(self, course_id: str, scheduled: List[Dict]) -> Dict:
+        """Build a diagnosis card: metadata + aggregated blockers + suggestion.
 
-        Returns (reason, suggestion): reason aggregates EVERY blocker that
-        applies (not just the first), suggestion runs counterfactual probes —
-        what minimal data change would free a slot.
+        Structural failures (no room type, no valid block from availability)
+        return early; every other blocker is COLLECTED so the card shows all
+        of them, not just the first.
         """
         course = self.data.course_dict[course_id]
         blocks = generate_consecutive_blocks(course.credits)
         lecturers = self.data.get_course_lecturers(course_id)
+        groups = self.data.get_course_student_groups(course_id)
+        compatible = self.data.get_compatible_rooms(course.room_type_required)
+        card = {
+            'course_id': course_id,
+            'course_code': course.code,
+            'course_name': course.name,
+            'credits': course.credits,
+            'room_type_required': course.room_type_required,
+            'rooms': [r.name for r in compatible],
+            'lecturers': [self.data.lecturer_dict[l].name for l in lecturers
+                          if l in self.data.lecturer_dict],
+            'student_groups': groups,
+        }
 
-        # Structural: no room of the required type at all
-        if not self.data.get_compatible_rooms(course.room_type_required):
-            return (
-                f"Tidak ada ruangan bertipe {course.room_type_required} — "
-                "sebuah kelas tidak mungkin ditempatkan.",
-                f"tambah satu ruangan bertipe {course.room_type_required} "
-                "di data/rooms.json, atau longgarkan room_type_required "
-                "mata kuliah ini di data/courses.json.")
+        if not compatible:
+            card['reason'] = (f"Tidak ada ruangan bertipe "
+                              f"{course.room_type_required}")
+            card['suggestion'] = "Tambahkan ruangan di data/rooms.json"
+            return card
 
-        # Availability: lecturers' windows leave no valid (day, block)
         options = [
             (d, b) for d in DAYS for b in blocks
             if all(d not in (self.data.get_lecturer_availability(l) or {})
@@ -171,15 +164,14 @@ class CourseScheduler:
         if not options:
             name = (self.data.lecturer_dict[lecturers[0]].name
                     if lecturers else "(tanpa dosen)")
-            return (
-                f"Ketersediaan {name} tidak menyisakan blok "
-                f"{course.credits} SKS sama sekali.",
-                f"perluas hari/jam mengajar {name} di "
-                "data/lecturer_availability.json, atau tugaskan dosen lain "
-                "di data/teaching_assignments.json.")
+            card['reason'] = (f"Ketersediaan {name} tidak menyisakan blok "
+                              f"{course.credits} SKS")
+            card['suggestion'] = (
+                "Perluas data/lecturer_availability.json atau ganti dosen "
+                "di data/teaching_assignments.json")
+            return card
 
-        # Aggregate every resource blocker instead of stopping at the first
-        blockers = []  # (kind, text, suggestion)
+        blockers = []
         for lecturer_id in lecturers:
             occupied = [e for e in scheduled
                         if lecturer_id in e.get('lecturer_ids', [])]
@@ -187,102 +179,85 @@ class CourseScheduler:
                                     for d, b in options):
                 name = self.data.lecturer_dict[lecturer_id].name
                 blockers.append((
-                    'lecturer',
-                    f"{name} sudah terjadwal penuh di setiap (hari, blok) "
-                    f"yang valid",
-                    f"bebaskan {name} dari satu mata kuliah lain, atau "
-                    "perluas ketersediaannya di "
-                    "data/lecturer_availability.json"))
+                    f"Dosen {name} sudah penuh di semua slot valid",
+                    "Alihkan satu mata kuliah di data/teaching_assignments.json "
+                    "atau longgarkan data/lecturer_availability.json"))
 
-        for group in self.data.get_course_student_groups(course_id):
+        for group in groups:
             occupied = [e for e in scheduled
                         if group in e.get('student_groups', [])]
             if occupied and not any(self._slots_free(d, b, occupied)
                                     for d, b in options):
                 blockers.append((
-                    'group',
-                    f"kelompok {group} sudah penuh di setiap (hari, blok) "
-                    f"yang valid",
-                    f"pindahkan {group} dari satu mata kuliah lain di "
+                    f"Kelompok {group} tidak punya jendela bebas "
+                    f"{course.credits} SKS tersisa minggu ini",
+                    "Pindahkan satu mata kuliah kelompok ini di "
                     "data/course_enrollments.json"))
 
-        free_rooms = []
-        for room in self.data.get_compatible_rooms(course.room_type_required):
-            occupied = [e for e in scheduled if e['room'] == room.name]
-            if any(self._slots_free(d, b, occupied) for d, b in options):
-                free_rooms.append(room.name)
-        if not free_rooms:
+        room_free = any(
+            any(self._slots_free(d, b,
+                                 [e for e in scheduled if e['room'] == r.name])
+                for d, b in options)
+            for r in compatible)
+        if not room_free:
             blockers.append((
-                'room',
-                f"semua ruangan tipe {course.room_type_required} terblokir "
-                "di setiap (hari, blok) yang valid",
-                f"tambah satu ruangan tipe {course.room_type_required} di "
-                "data/rooms.json"))
+                f"Semua ruangan tipe {course.room_type_required} terblokir "
+                "di setiap slot valid",
+                "Tambah ruangan di data/rooms.json"))
 
-        if not blockers:
-            # every single resource has a free window, but not simultaneously
-            blockers.append((
-                'combination',
-                f"setiap dosen, kelompok, dan ruangan punya jendela bebas "
-                f"tersendiri, tapi hanya {len(options)} opsi (hari, blok) "
-                f"valid tersisa dan tidak ada yang bebas bersamaan",
-                "bebaskan satu slot dengan memindahkan jadwal satu mata "
-                "kuliah sejenis, atau tambah ruangan/dosen di data/"))
+        if blockers:
+            card['reason'] = "Blokir: " + "; ".join(t for t, _ in blockers)
+            card['suggestion'] = blockers[0][1]
+        else:
+            card['reason'] = (
+                f"Setiap resource bebas di satu opsi, namun tidak pernah "
+                f"bersamaan — hanya {len(options)} opsi (hari, blok) valid "
+                "tersisa")
+            card['suggestion'] = (
+                "Alihkan satu tugas di data/teaching_assignments.json atau "
+                "longgarkan ketersediaan di data/lecturer_availability.json")
 
-        reason = ("Blokir: " + "; ".join(t for _, t, _ in blockers) + ".")
-        suggestion = self._suggest(
-            course_id, options, blockers, scheduled)
-        return reason, suggestion
+        concrete = self._suggest(course_id, options, scheduled)
+        if concrete:
+            card['suggestion'] = concrete
+        return card
 
-    def _suggest(self, course_id: str, options, blockers,
-                 scheduled) -> str:
-        """Counterfactual suggestion: what minimal data change frees a slot.
-
-        For each valid (day, block) compute the scheduled courses sharing a
-        resource AND overlapping it; if evicting exactly those opens the
-        slot, name them + the slot. Falls back to generic advice.
-        """
-        generic = blockers[0][2]
+    def _shares(self, entry: Dict, course_id: str) -> bool:
+        """True if a scheduled entry shares lecturer/group/room with course."""
         course = self.data.course_dict[course_id]
         lecturers = set(self.data.get_course_lecturers(course_id))
         groups = set(self.data.get_course_student_groups(course_id))
         room_names = {r.name for r in
-                      self.data.get_compatible_rooms(
-                          course.room_type_required)}
-        day_id = {"MONDAY": "Senin", "TUESDAY": "Selasa",
-                  "WEDNESDAY": "Rabu", "THURSDAY": "Kamis",
-                  "FRIDAY": "Jumat", "SATURDAY": "Sabtu"}
+                      self.data.get_compatible_rooms(course.room_type_required)}
+        return (bool(lecturers & set(entry.get('lecturer_ids', [])))
+                or bool(groups & set(entry.get('student_groups', [])))
+                or entry.get('room') in room_names)
 
-        best = ""
-        for d, b in options:
-            clash = set()
-            for e in scheduled:
-                if e['day'] != d:
-                    continue
-                if not slots_overlap(list(range(b[0], b[-1] + 1)),
-                                     list(range(e['start_slot'],
-                                                e['end_slot'] + 1))):
-                    continue
-                shares = (lecturers & set(e.get('lecturer_ids', []))
-                          or groups & set(e.get('student_groups', []))
-                          or e['room'] in room_names)
-                if shares:
-                    clash.add(e['course_name'])
-            if not clash:
-                continue
-            kept = [e for e in scheduled if e['course_name'] not in clash]
-            if not self._slots_free(d, b, kept):
-                continue
-            day_label = f"{day_id[d]} slot {b[0]}–{b[-1]}"
-            names = ", ".join(sorted(clash))
-            text = (f"bebaskan {names} dari {day_label} "
-                    "(atau pindahkan satu dari mereka ke hari lain)")
-            if not best or len(clash) < best[1]:
-                best = (text, len(clash))
-        return best[0] if best else generic
+    def _suggest(self, course_id: str, options: List,
+                 scheduled: List[Dict]) -> str:
+        """Counterfactual probe: smallest set of scheduled courses whose
+        eviction frees one valid (day, block). Pure Python, no re-solve."""
+        candidates = [e for e in scheduled
+                      if e['course_id'] != course_id
+                      and self._shares(e, course_id)]
+        for day, block in options:
+            needed = [e for e in candidates
+                      if e['day'] == day and
+                      slots_overlap(list(range(block[0], block[-1] + 1)),
+                                    list(range(e['start_slot'],
+                                               e['end_slot'] + 1)))]
+            if needed and self._slots_free(
+                    day, block,
+                    [e for e in scheduled if e not in needed]):
+                names = ", ".join(dict.fromkeys(
+                    e['course_name'] for e in needed))
+                return (f"Bebaskan {names} dari {DAY_ID[day]} slot "
+                        f"{block[0]}–{block[-1]} (atau pindahkan salah satu "
+                        "ke hari lain)")
+        return ""
 
     def diagnose_dropped(self, dropped: List[Dict]) -> List[Dict]:
-        """Temuan per mata kuliah yang dilewati pada penjadwalan parsial."""
+        """Diagnosis cards per skipped course (already structured)."""
         return dropped
 
     def diagnose(self) -> List[str]:
@@ -452,13 +427,14 @@ class CourseScheduler:
 
             # Get compatible rooms
             compatible_rooms = self.data.get_compatible_rooms(course.room_type_required)
-            if not compatible_rooms:
-                raise ValueError(f"No compatible rooms for course {course_id} requiring {course.room_type_required}")
-
+            room_domain = compatible_rooms or self.data.rooms
             sched = self.model.NewBoolVar(f'{course_id}_sched')
+            if not compatible_rooms:
+                # Unplaceable by design: force skip, _drop_reason explains.
+                self.model.Add(sched == 0)
             day = self.model.NewIntVar(0, len(DAYS) - 1, f'{course_id}_day')
             block_idx = self.model.NewIntVar(0, len(blocks) - 1, f'{course_id}_block')
-            room = self.model.NewIntVar(0, len(compatible_rooms) - 1, f'{course_id}_room')
+            room = self.model.NewIntVar(0, len(room_domain) - 1, f'{course_id}_room')
 
             # Absolute start on shifted timeline
             offsets = [b[0] - 1 for b in blocks]
@@ -479,7 +455,7 @@ class CourseScheduler:
             # One OPTIONAL interval per compatible room (presence = both
             # scheduled AND assigned to this room)
             room_intervals = {}
-            for idx, r in enumerate(compatible_rooms):
+            for idx, r in enumerate(room_domain):
                 pres = self.model.NewBoolVar(f'{course_id}_uses_{r.id}')
                 self.model.Add(pres <= sched)
                 self.model.Add(room == idx).OnlyEnforceIf(pres)
@@ -494,7 +470,7 @@ class CourseScheduler:
                 'block_idx': block_idx,
                 'room': room,
                 'blocks': blocks,
-                'rooms': compatible_rooms,
+                'rooms': room_domain,
                 'interval': interval,
                 'room_intervals': room_intervals,
             }
