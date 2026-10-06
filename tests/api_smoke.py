@@ -70,8 +70,14 @@ check("POST /schedule/validate", s == 200 and "valid" in v and
 
 # --- diagnose
 s, d = call("GET", "/diagnose")
-check("GET /diagnose", s == 200 and "findings" in d,
-      f"({s}, findings={len(d.get('findings', []))})")
+check("GET /diagnose", s == 200 and "items" in d and
+      isinstance(d.get("items"), list),
+      f"({s}, items={len(d.get('items', []))})")
+if d.get("items") and "course_name" in d["items"][0]:
+    it = d["items"][0]
+    check("diagnose item has suggestion",
+          all(k in it for k in ("course_name", "reason", "suggestion")),
+          f"(keys={sorted(it)})")
 
 print(f"\n{'SEMUA LULUS' if not fails else 'GAGAL: ' + ', '.join(fails)}")
 sys.exit(1 if fails else 0)

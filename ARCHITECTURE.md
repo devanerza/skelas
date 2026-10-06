@@ -212,7 +212,8 @@ Flat array (written by `run_scheduler.py`, read by `validate_schedule.py`):
 
 `ScheduleResult` envelope (in-memory): `status`, `solve_time`, `schedule[]`,
 `message`, `dropped[]` (each: `course_id`, `course_code`, `course_name`,
-`reason`).
+`credits`, `room_type_required`, `rooms[]`, `lecturers[]`, `student_groups[]`,
+`reason`, `suggestion`) — everything a diagnosis card needs.
 
 Status contract:
 - `FEASIBLE` — all courses scheduled
@@ -327,16 +328,62 @@ courses to skip in a single solve (no probe loop).
   - 0 scheduled → `INFEASIBLE`
   - all → `FEASIBLE`
   - some → `PARTIAL` + `dropped[]` where `_drop_reason()` re-derives WHY
-    (no compatible room → availability leaves no block → lecturer slot-full →
-    group no free window → all rooms blocked → combination clash), each
-    message naming the JSON file to edit.
+    (see 4.7), each message naming the JSON file to edit.
 - `_extract_solution()` maps var values back to the output schema
   (day name, block → start/end slot, room name, time string from
   `time_slots.json`).
 
-### 4.7 Diagnosis (`diagnose()` / `diagnose_dropped()`)
+### 4.7 Diagnosis — the per-course card method
 
-When infeasible, static + probe analysis produces actionable findings:
+Two separate paths (kept separate on purpose):
+
+| Path | Trigger | Output |
+|---|---|---|
+| `_drop_reason(course_id, schedule)` | PARTIAL run — solver already placed everything it could | `dropped[]`: structured **per-course card** |
+| `diagnose()` | full INFEASIBLE/UNKNOWN — no partial schedule exists to reason against | `findings[]`: plain strings, entity-level |
+
+`diagnose_dropped()` is now a pass-through returning `dropped` as
+`List[dict]` — the cards already carry `course_name`/`reason`/`suggestion`.
+
+**Copy this method to another repo in 4 steps:**
+
+1. **Aggregate every blocker, don't stop at the first.** `_drop_reason`
+   runs the check ladder (no room type → no valid (day, block) from
+   lecturer availability → both return early, they are structural) and then
+   *collects* the rest into `blockers: [(kind, text, suggestion)]`:
+   `lecturer` (co-lecturer fully booked in every valid window), `group`
+   (student group fully booked), `room` (no compatible room free in any
+   valid window), `combination` (each resource free somewhere, never
+   together — includes how many valid `(day, block)` options remain).
+   `reason = "Blokir: " + "; ".join(texts)`.
+
+2. **Add a `suggestion` column.** Each blocker carries its own generic fix
+   (name the file: `data/lecturer_availability.json`,
+   `data/teaching_assignments.json`, `data/course_enrollments.json`,
+   `data/rooms.json`). SQLite: add the column to the `schedule_dropped`
+   DDL + a forward `ALTER TABLE ... ADD COLUMN` in `connect()` so existing
+   `.db` files migrate; persist/load it in `save_run()`/`load_latest()`.
+
+3. **Probe for a concrete counterfactual** (`_suggest`): for every valid
+   `(day, block)`, collect scheduled courses that both overlap it *and*
+   share a resource (lecturer id / group id / room name). If evicting
+   exactly those frees the slot, report the smallest such set:
+   `bebaskan X, Y, Z dari Senin slot 7–9`. Otherwise fall back to blocker
+   1's generic advice. Pure Python over the already-extracted schedule —
+   no extra solver call.
+
+4. **Carry card metadata in the payload** (`credits`,
+   `room_type_required`, `rooms[]`, `lecturers[]`, `student_groups[]`) so
+   the UI prints `MK-407 · 3 SKS · LAB · Ruang: ...` without joining other
+   tables.
+
+**Contract:** `GET /diagnose` → `{run_id, status, items: List[dict]}`;
+`items` = the `dropped[]` cards when PARTIAL, or `[{"finding": str}]`
+(full-model `diagnose()`) when INFEASIBLE/UNKNOWN. CLI prints the same
+cards (metadata line + `Alasan:` + `Saran:`).
+
+The full-model `diagnose()` findings (entity-level, when no schedule
+exists):
 
 1. per course×lecturer: zero (day, block) options, or ≤4 options (risk)
 2. per lecturer: load SKS > free slots (provably impossible) or

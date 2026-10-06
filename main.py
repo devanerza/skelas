@@ -106,16 +106,18 @@ def validate_latest(conn=Depends(get_conn)):
 
 @app.get("/diagnose")
 def diagnose(conn=Depends(get_conn)):
-    """Findings for the latest run: per-dropped-course reasons, or full
-    diagnosis when nothing could be scheduled."""
+    """Per-course diagnosis for the latest run as List[dict] (each:
+    course_code, course_name, credits, room_type_required, rooms,
+    lecturers, student_groups, reason, suggestion), or the full-model
+    findings when nothing could be scheduled."""
     latest = db.load_latest(conn)
     if latest is None:
         raise HTTPException(404, "Belum ada jadwal tersimpan — jalankan POST /schedule/run")
     scheduler = CourseScheduler(SchedulerData(conn=conn))
     if latest["dropped"]:
-        findings = _silent(scheduler.diagnose_dropped, latest["dropped"])
+        items = _silent(scheduler.diagnose_dropped, latest["dropped"])
     elif latest["status"] in ("INFEASIBLE", "UNKNOWN"):
-        findings = _silent(scheduler.diagnose)
+        items = [{"finding": f} for f in _silent(scheduler.diagnose)]
     else:
-        findings = []
-    return {"run_id": latest["id"], "status": latest["status"], "findings": findings}
+        items = []
+    return {"run_id": latest["id"], "status": latest["status"], "items": items}

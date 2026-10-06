@@ -95,7 +95,13 @@ CREATE TABLE IF NOT EXISTS schedule_dropped (
     course_id TEXT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     course_code TEXT NOT NULL,
     course_name TEXT NOT NULL,
-    reason TEXT NOT NULL
+    reason TEXT NOT NULL,
+    suggestion TEXT NOT NULL DEFAULT '',
+    credits INTEGER NOT NULL DEFAULT 0,
+    room_type_required TEXT NOT NULL DEFAULT '',
+    rooms TEXT NOT NULL DEFAULT '[]',
+    lecturers TEXT NOT NULL DEFAULT '[]',
+    student_groups TEXT NOT NULL DEFAULT '[]'
 );
 """
 
@@ -129,6 +135,18 @@ def connect(db_path=DEFAULT_DB) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
+    # Forward migration: older skelas.db files predate the diagnosis columns
+    have = {r["name"] for r in conn.execute("PRAGMA table_info(schedule_dropped)")}
+    for col, ddl in (
+        ("suggestion", "ALTER TABLE schedule_dropped ADD COLUMN suggestion TEXT NOT NULL DEFAULT ''"),
+        ("credits", "ALTER TABLE schedule_dropped ADD COLUMN credits INTEGER NOT NULL DEFAULT 0"),
+        ("room_type_required", "ALTER TABLE schedule_dropped ADD COLUMN room_type_required TEXT NOT NULL DEFAULT ''"),
+        ("rooms", "ALTER TABLE schedule_dropped ADD COLUMN rooms TEXT NOT NULL DEFAULT '[]'"),
+        ("lecturers", "ALTER TABLE schedule_dropped ADD COLUMN lecturers TEXT NOT NULL DEFAULT '[]'"),
+        ("student_groups", "ALTER TABLE schedule_dropped ADD COLUMN student_groups TEXT NOT NULL DEFAULT '[]'"),
+    ):
+        if col not in have:
+            conn.execute(ddl)
     return conn
 
 
@@ -415,9 +433,16 @@ def save_run(conn, result) -> int:
         for d in (result.dropped or []):
             conn.execute(
                 "INSERT INTO schedule_dropped (schedule_id, course_id, "
-                "course_code, course_name, reason) VALUES (?, ?, ?, ?, ?)",
+                "course_code, course_name, reason, suggestion, credits, "
+                "room_type_required, rooms, lecturers, student_groups) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (run_id, d.get("course_id", ""), d.get("course_code", ""),
-                 d.get("course_name", ""), d.get("reason", "")))
+                 d.get("course_name", ""), d.get("reason", ""),
+                 d.get("suggestion", ""), d.get("credits", 0),
+                 d.get("room_type_required", ""),
+                 json.dumps(d.get("rooms") or []),
+                 json.dumps(d.get("lecturers") or []),
+                 json.dumps(d.get("student_groups") or [])))
     return run_id
 
 
@@ -438,10 +463,16 @@ def load_latest(conn) -> Optional[dict]:
         e.pop("schedule_id")
         entries.append(e)
 
-    dropped = [dict(r) for r in conn.execute(
-        "SELECT course_id, course_code, course_name, reason "
-        "FROM schedule_dropped WHERE schedule_id = ? ORDER BY id",
-        (row["id"],))]
+    dropped = []
+    for r in conn.execute(
+            "SELECT * FROM schedule_dropped WHERE schedule_id = ? "
+            "ORDER BY id", (row["id"],)):
+        e = dict(r)
+        e.pop("id")
+        e.pop("schedule_id")
+        for k in ("rooms", "lecturers", "student_groups"):
+            e[k] = json.loads(e[k])
+        dropped.append(e)
 
     return {
         "id": row["id"],
